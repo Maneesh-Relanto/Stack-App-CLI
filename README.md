@@ -1,4 +1,4 @@
-# 🚀 Create Stack App
+# Create Stack App
 
 > A modern CLI tool to generate production-ready boilerplates across multiple programming languages and frameworks
 
