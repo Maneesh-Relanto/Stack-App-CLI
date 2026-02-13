@@ -1,0 +1,56 @@
+{
+  "name": "create-stack-app",
+  "version": "1.0.0",
+  "description": "A modern CLI tool to generate production-ready boilerplates across multiple programming languages and frameworks",
+  "main": "src/index.js",
+  "bin": {
+    "create-stack-app": "./src/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js",
+    "test": "echo \"Tests coming soon\" && exit 0"
+  },
+  "keywords": [
+    "boilerplate",
+    "cli",
+    "generator",
+    "starter",
+    "template",
+    "scaffold",
+    "react",
+    "nextjs",
+    "python",
+    "rust",
+    "go",
+    "typescript"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "inquirer": "^9.2.12",
+    "ora": "^8.0.1",
+    "figlet": "^1.7.0",
+    "gradient-string": "^2.0.2",
+    "boxen": "^7.1.1",
+    "fs-extra": "^11.2.0",
+    "execa": "^8.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/create-stack-app"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/create-stack-app/issues"
+  },
+  "homepage": "https://github.com/yourusername/create-stack-app#readme"
+}

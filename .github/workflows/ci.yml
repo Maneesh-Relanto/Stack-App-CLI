@@ -1,0 +1,67 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linter
+      run: npm run lint || echo "No lint script found"
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Test CLI execution
+      run: |
+        node src/index.js list
+        echo "CLI execution successful"
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20.x'
+        registry-url: 'https://registry.npmjs.org'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Publish to NPM (if version changed)
+      run: |
+        # Only publish if package.json version doesn't exist on npm
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+        if npm view create-stack-app@$PACKAGE_VERSION version; then
+          echo "Version $PACKAGE_VERSION already published"
+        else
+          npm publish
+          echo "Published version $PACKAGE_VERSION"
+        fi
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

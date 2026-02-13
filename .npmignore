@@ -1,0 +1,27 @@
+# Development files
+.git
+.gitignore
+.DS_Store
+*.log
+
+# Documentation (keep README.md)
+docs/
+CONTRIBUTING.md
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# Editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# CI
+.github/
+
+# Examples
+examples/
