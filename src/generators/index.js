@@ -67,8 +67,53 @@ export async function generateProject(projectPath, templateId, templateConfig, f
   }
 }
 
+// Helper function to get install command by language
+function getInstallCommand(language) {
+  const commands = {
+    'TypeScript': 'npm install',
+    'JavaScript': 'npm install',
+    'Python': 'python -m venv venv\nsource venv/bin/activate  # On Windows: venv\\Scripts\\activate\npip install -r requirements.txt',
+    'Rust': 'cargo build',
+    'Go': 'go mod download'
+  };
+  return commands[language] || 'See documentation';
+}
+
+// Helper function to get run command by language
+function getRunCommand(language) {
+  const commands = {
+    'TypeScript': 'npm run dev',
+    'JavaScript': 'npm run dev',
+    'Python': 'python main.py  # or uvicorn main:app --reload for FastAPI',
+    'Rust': 'cargo run',
+    'Go': 'go run main.go'
+  };
+  return commands[language] || '# See documentation';
+}
+
+// Helper function to get test command by language
+function getTestCommand(language) {
+  const commands = {
+    'TypeScript': 'npm test',
+    'JavaScript': 'npm test',
+    'Python': 'pytest',
+    'Rust': 'cargo test',
+    'Go': 'go test ./...'
+  };
+  return commands[language] || '# See documentation';
+}
+
 async function generateReadme(projectPath, templateConfig, features) {
-  const readme = `# ${path.basename(projectPath)}
+  const projectName = path.basename(projectPath);
+  const templateFeatures = templateConfig.features.map(f => `- ${f}`).join('\n');
+  const additionalFeatures = features.length > 0 
+    ? '\n## 🔧 Additional Features\n\n' + features.map(f => `- ${f}`).join('\n')
+    : '';
+  const dockerSection = features.includes('docker')
+    ? '\n### Running with Docker\n\n```bash\ndocker-compose up\n```\n'
+    : '';
+
+  const readme = `# ${projectName}
 
 ## 📖 Overview
 
@@ -79,9 +124,8 @@ ${templateConfig.description}
 
 ## ✨ Features
 
-${templateConfig.features.map(f => `- ${f}`).join('\n')}
-
-${features.length > 0 ? '\n## 🔧 Additional Features\n\n' + features.map(f => `- ${f}`).join('\n') : ''}
+${templateFeatures}
+${additionalFeatures}
 
 ## 🚀 Getting Started
 
@@ -96,42 +140,18 @@ ${features.length > 0 ? '\n## 🔧 Additional Features\n\n' + features.map(f => 
 
 \`\`\`bash
 # Clone the repository
-cd ${path.basename(projectPath)}
+cd ${projectName}
 
 # Install dependencies
-${templateConfig.language === 'TypeScript' || templateConfig.language === 'JavaScript' 
-  ? 'npm install'
-  : templateConfig.language === 'Python'
-  ? 'python -m venv venv\nsource venv/bin/activate  # On Windows: venv\\Scripts\\activate\npip install -r requirements.txt'
-  : templateConfig.language === 'Rust'
-  ? 'cargo build'
-  : templateConfig.language === 'Go'
-  ? 'go mod download'
-  : 'See documentation'}
+${getInstallCommand(templateConfig.language)}
 \`\`\`
 
 ### Running the Application
 
 \`\`\`bash
-${templateConfig.language === 'TypeScript' || templateConfig.language === 'JavaScript'
-  ? 'npm run dev'
-  : templateConfig.language === 'Python'
-  ? 'python main.py  # or uvicorn main:app --reload for FastAPI'
-  : templateConfig.language === 'Rust'
-  ? 'cargo run'
-  : templateConfig.language === 'Go'
-  ? 'go run main.go'
-  : '# See documentation'}
+${getRunCommand(templateConfig.language)}
 \`\`\`
-
-${features.includes('docker') ? `
-### Running with Docker
-
-\`\`\`bash
-docker-compose up
-\`\`\`
-` : ''}
-
+${dockerSection}
 ## 📁 Project Structure
 
 \`\`\`
@@ -141,15 +161,7 @@ ${generateProjectStructure(templateConfig.language)}
 ## 🧪 Testing
 
 \`\`\`bash
-${templateConfig.language === 'TypeScript' || templateConfig.language === 'JavaScript'
-  ? 'npm test'
-  : templateConfig.language === 'Python'
-  ? 'pytest'
-  : templateConfig.language === 'Rust'
-  ? 'cargo test'
-  : templateConfig.language === 'Go'
-  ? 'go test ./...'
-  : '# See documentation'}
+${getTestCommand(templateConfig.language)}
 \`\`\`
 
 ## 📚 Documentation

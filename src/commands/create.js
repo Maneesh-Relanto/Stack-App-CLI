@@ -8,25 +8,162 @@ import { execa } from 'execa';
 import { templates, categories, languages } from '../config/templates.js';
 import { generateProject } from '../generators/index.js';
 
+// Helper: Get project name from user input
+async function getProjectName(projectName) {
+  if (projectName) return projectName;
+  
+  const nameAnswer = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'projectName',
+      message: 'What is your project name?',
+      default: 'my-awesome-app',
+      validate: (input) => {
+        if (/^[a-z0-9-_]+$/.test(input)) return true;
+        return 'Project name may only include lowercase letters, numbers, dashes, and underscores';
+      }
+    }
+  ]);
+  return nameAnswer.projectName;
+}
+
+// Helper: Get template by language
+async function selectByLanguage() {
+  const { language } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'language',
+      message: 'Choose your programming language:',
+      choices: Object.keys(languages).map(lang => ({
+        name: `${lang} (${languages[lang].length} templates)`,
+        value: lang
+      }))
+    }
+  ]);
+
+  const languageTemplates = languages[language].map(templateId => ({
+    name: `${templates[templateId].name} - ${templates[templateId].description}`,
+    value: templateId
+  }));
+
+  const { template } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'template',
+      message: `Choose a ${language} template:`,
+      choices: languageTemplates
+    }
+  ]);
+
+  return template;
+}
+
+// Helper: Get template by category
+async function selectByCategory() {
+  const { category } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'category',
+      message: 'Choose a category:',
+      choices: [
+        { name: '🎨 Frontend', value: 'frontend' },
+        { name: '⚙️  Backend API', value: 'backend' },
+        { name: '🔄 Full-Stack', value: 'fullstack' },
+        { name: '🤖 AI/ML', value: 'ai' },
+        { name: '📱 Mobile', value: 'mobile' }
+      ]
+    }
+  ]);
+
+  const categoryTemplates = categories[category].map(templateId => ({
+    name: `${templates[templateId].name} (${templates[templateId].language}) - ${templates[templateId].description}`,
+    value: templateId
+  }));
+
+  const { template } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'template',
+      message: `Choose a ${category} template:`,
+      choices: categoryTemplates
+    }
+  ]);
+
+  return template;
+}
+
+// Helper: Get template from all templates
+async function selectAllTemplates() {
+  const allTemplates = Object.keys(templates).map(templateId => ({
+    name: `${templates[templateId].name} (${templates[templateId].language}) - ${templates[templateId].description}`,
+    value: templateId
+  }));
+
+  const { template } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'template',
+      message: 'Choose a template:',
+      choices: allTemplates,
+      pageSize: 15
+    }
+  ]);
+
+  return template;
+}
+
+// Helper: Select additional features
+async function selectFeatures() {
+  const { features } = await inquirer.prompt([
+    {
+      type: 'checkbox',
+      name: 'features',
+      message: 'Select additional features (optional):',
+      choices: [
+        { name: 'Docker & Docker Compose', value: 'docker', checked: true },
+        { name: 'GitHub Actions CI/CD', value: 'ci', checked: true },
+        { name: 'ESLint/Prettier (if applicable)', value: 'linting', checked: true },
+        { name: 'Testing Setup (Jest/Pytest/etc)', value: 'testing', checked: true },
+        { name: 'Pre-commit Hooks', value: 'hooks', checked: false },
+        { name: 'VS Code Settings', value: 'vscode', checked: true }
+      ]
+    }
+  ]);
+  return features;
+}
+
+// Helper: Confirm project creation
+async function confirmProjectCreation(projectName, templateConfig, features) {
+  console.log('\n' + boxen(
+    chalk.bold('📦 Project Configuration\n\n') +
+    chalk.cyan('Name: ') + chalk.white(projectName) + '\n' +
+    chalk.cyan('Template: ') + chalk.white(templateConfig.name) + '\n' +
+    chalk.cyan('Language: ') + chalk.white(templateConfig.language) + '\n' +
+    chalk.cyan('Features: ') + chalk.white(features.join(', ') || 'None') + '\n',
+    {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'round',
+      borderColor: 'cyan'
+    }
+  ));
+
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: 'Proceed with project creation?',
+      default: true
+    }
+  ]);
+
+  return confirm;
+}
+
 export async function createProject(projectName, options = {}) {
   try {
     // Step 1: Get project name
-    let finalProjectName = projectName;
-    if (!finalProjectName) {
-      const nameAnswer = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'projectName',
-          message: 'What is your project name?',
-          default: 'my-awesome-app',
-          validate: (input) => {
-            if (/^[a-z0-9-_]+$/.test(input)) return true;
-            return 'Project name may only include lowercase letters, numbers, dashes, and underscores';
-          }
-        }
-      ]);
-      finalProjectName = nameAnswer.projectName;
-    }
+    const finalProjectName = await getProjectName(projectName);
 
     // Step 2: Choose selection method
     const { selectionMethod } = await inquirer.prompt([
@@ -42,130 +179,23 @@ export async function createProject(projectName, options = {}) {
       }
     ]);
 
+    // Step 3: Template selection
     let selectedTemplate;
-
-    // Step 3: Template selection based on method
     if (selectionMethod === 'language') {
-      const { language } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'language',
-          message: 'Choose your programming language:',
-          choices: Object.keys(languages).map(lang => ({
-            name: `${lang} (${languages[lang].length} templates)`,
-            value: lang
-          }))
-        }
-      ]);
-
-      const languageTemplates = languages[language].map(templateId => ({
-        name: `${templates[templateId].name} - ${templates[templateId].description}`,
-        value: templateId
-      }));
-
-      const { template } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'template',
-          message: `Choose a ${language} template:`,
-          choices: languageTemplates
-        }
-      ]);
-
-      selectedTemplate = template;
+      selectedTemplate = await selectByLanguage();
     } else if (selectionMethod === 'category') {
-      const { category } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'category',
-          message: 'Choose a category:',
-          choices: [
-            { name: '🎨 Frontend', value: 'frontend' },
-            { name: '⚙️  Backend API', value: 'backend' },
-            { name: '🔄 Full-Stack', value: 'fullstack' },
-            { name: '🤖 AI/ML', value: 'ai' },
-            { name: '📱 Mobile', value: 'mobile' }
-          ]
-        }
-      ]);
-
-      const categoryTemplates = categories[category].map(templateId => ({
-        name: `${templates[templateId].name} (${templates[templateId].language}) - ${templates[templateId].description}`,
-        value: templateId
-      }));
-
-      const { template } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'template',
-          message: `Choose a ${category} template:`,
-          choices: categoryTemplates
-        }
-      ]);
-
-      selectedTemplate = template;
+      selectedTemplate = await selectByCategory();
     } else {
-      // Show all templates
-      const allTemplates = Object.keys(templates).map(templateId => ({
-        name: `${templates[templateId].name} (${templates[templateId].language}) - ${templates[templateId].description}`,
-        value: templateId
-      }));
-
-      const { template } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'template',
-          message: 'Choose a template:',
-          choices: allTemplates,
-          pageSize: 15
-        }
-      ]);
-
-      selectedTemplate = template;
+      selectedTemplate = await selectAllTemplates();
     }
 
     const templateConfig = templates[selectedTemplate];
 
     // Step 4: Additional options
-    const { features } = await inquirer.prompt([
-      {
-        type: 'checkbox',
-        name: 'features',
-        message: 'Select additional features (optional):',
-        choices: [
-          { name: 'Docker & Docker Compose', value: 'docker', checked: true },
-          { name: 'GitHub Actions CI/CD', value: 'ci', checked: true },
-          { name: 'ESLint/Prettier (if applicable)', value: 'linting', checked: true },
-          { name: 'Testing Setup (Jest/Pytest/etc)', value: 'testing', checked: true },
-          { name: 'Pre-commit Hooks', value: 'hooks', checked: false },
-          { name: 'VS Code Settings', value: 'vscode', checked: true }
-        ]
-      }
-    ]);
+    const features = await selectFeatures();
 
     // Step 5: Confirm
-    console.log('\n' + boxen(
-      chalk.bold('📦 Project Configuration\n\n') +
-      chalk.cyan('Name: ') + chalk.white(finalProjectName) + '\n' +
-      chalk.cyan('Template: ') + chalk.white(templateConfig.name) + '\n' +
-      chalk.cyan('Language: ') + chalk.white(templateConfig.language) + '\n' +
-      chalk.cyan('Features: ') + chalk.white(features.join(', ') || 'None') + '\n',
-      {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'cyan'
-      }
-    ));
-
-    const { confirm } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirm',
-        message: 'Proceed with project creation?',
-        default: true
-      }
-    ]);
+    const confirm = await confirmProjectCreation(finalProjectName, templateConfig, features);
 
     if (!confirm) {
       console.log(chalk.yellow('\n✋ Project creation cancelled.'));
@@ -204,7 +234,6 @@ export async function createProject(projectName, options = {}) {
           await execa(packageManager, ['install'], { cwd: projectPath });
         } else if (templateConfig.language === 'Python') {
           await execa('python', ['-m', 'venv', 'venv'], { cwd: projectPath });
-          // Additional pip install commands would go here
         } else if (templateConfig.language === 'Rust') {
           await execa('cargo', ['build'], { cwd: projectPath });
         } else if (templateConfig.language === 'Go') {
@@ -241,18 +270,22 @@ async function detectPackageManager() {
   return 'npm'; // default
 }
 
+// Helper: Get start command by language
+function getStartCommand(language) {
+  const commands = {
+    'TypeScript': 'npm run dev',
+    'JavaScript': 'npm run dev',
+    'Python': 'source venv/bin/activate && python main.py',
+    'Rust': 'cargo run',
+    'Go': 'go run main.go'
+  };
+  return commands[language] || 'See README.md for instructions';
+}
+
 function displaySuccessMessage(projectName, templateConfig, features) {
   const nextSteps = [
     `cd ${projectName}`,
-    templateConfig.language === 'TypeScript' || templateConfig.language === 'JavaScript' 
-      ? 'npm run dev' 
-      : templateConfig.language === 'Python'
-      ? 'source venv/bin/activate && python main.py'
-      : templateConfig.language === 'Rust'
-      ? 'cargo run'
-      : templateConfig.language === 'Go'
-      ? 'go run main.go'
-      : 'See README.md for instructions'
+    getStartCommand(templateConfig.language)
   ];
 
   console.log('\n' + boxen(
