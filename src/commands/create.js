@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import boxen from 'boxen';
 import fs from 'fs-extra';
-import path from 'path';
+import path from 'node:path';
 import { execa } from 'execa';
 import { templates, categories, languages } from '../config/templates.js';
 import { generateProject } from '../generators/index.js';

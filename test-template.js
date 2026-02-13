@@ -3,8 +3,8 @@
 import { generateProject } from './src/generators/index.js';
 import { templates } from './src/config/templates.js';
 import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

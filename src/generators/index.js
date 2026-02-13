@@ -1,6 +1,6 @@
 import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,7 +81,7 @@ ${templateConfig.description}
 
 ${templateConfig.features.map(f => `- ${f}`).join('\n')}
 
-${features.length > 0 ? `\n## 🔧 Additional Features\n\n${features.map(f => `- ${f}`).join('\n')}` : ''}
+${features.length > 0 ? '\n## 🔧 Additional Features\n\n' + features.map(f => `- ${f}`).join('\n') : ''}
 
 ## 🚀 Getting Started
 
@@ -1237,7 +1237,7 @@ def health_check():
 
 async function generateRustAxum(projectPath, features) {
   const cargoToml = `[package]
-name = "${path.basename(projectPath).replace(/-/g, '_')}"
+name = "${path.basename(projectPath).replaceAll('-', '_')}"
 version = "0.1.0"
 edition = "2021"
 
