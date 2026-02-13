@@ -921,17 +921,45 @@ VITE_APP_NAME=My React App
 }
 
 async function generateNodeExpressAPI(projectPath, features) {
+  // Create src directory
+  await fs.ensureDir(path.join(projectPath, 'src'));
+
+  // Enhanced package.json
   const packageJson = {
     name: path.basename(projectPath),
     version: '1.0.0',
     type: 'module',
     scripts: {
       dev: 'nodemon src/index.js',
-      start: 'node src/index.js'
+      start: 'node src/index.js',
+      lint: 'eslint src',
+      ...(features.includes('testing') && { test: 'jest --watch' })
     },
     dependencies: {
       express: '^4.18.0',
-      dotenv: '^16.0.0'
+      'express-validator': '^7.0.0',
+      dotenv: '^16.0.0',
+      cors: '^2.8.5',
+      helmet: '^7.0.0',
+      'morgan': '^1.10.0',
+      'pg': '^8.11.0',
+      'prisma': '^5.8.0',
+      'jsonwebtoken': '^9.0.0'
+    },
+    devDependencies: {
+      'nodemon': '^3.0.0',
+      'typescript': '^5.3.0',
+      '@types/node': '^20.0.0',
+      '@types/express': '^4.17.0',
+      '@types/jsonwebtoken': '^9.0.0',
+      ...(features.includes('linting') && {
+        'eslint': '^8.56.0',
+        'prettier': '^3.1.0'
+      }),
+      ...(features.includes('testing') && {
+        'jest': '^29.0.0',
+        'supertest': '^6.3.0'
+      })
     }
   };
 
@@ -939,6 +967,243 @@ async function generateNodeExpressAPI(projectPath, features) {
     path.join(projectPath, 'package.json'),
     JSON.stringify(packageJson, null, 2)
   );
+
+  // tsconfig.json (for TypeScript support if needed)
+  const tsConfig = {
+    compilerOptions: {
+      target: 'ES2020',
+      module: 'ES2020',
+      lib: ['ES2020'],
+      outDir: './dist',
+      rootDir: './src',
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      forceConsistentCasingInFileNames: true,
+      resolveJsonModule: true,
+      declaration: true,
+      declarationMap: true,
+      sourceMap: true
+    },
+    include: ['src/**/*'],
+    exclude: ['node_modules', 'dist']
+  };
+
+  await fs.writeFile(
+    path.join(projectPath, 'tsconfig.json'),
+    JSON.stringify(tsConfig, null, 2)
+  );
+
+  // .env.example
+  const envExample = `# Server Configuration
+NODE_ENV=development
+PORT=5000
+HOST=localhost
+
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://user:password@localhost:5432/mydb
+
+# JWT
+JWT_SECRET=your_jwt_secret_key_here_change_this
+JWT_EXPIRE=7d
+
+# CORS
+CORS_ORIGIN=http://localhost:3000
+
+# API Documentation
+API_DOCS_PATH=/api/docs
+
+# Logging
+LOG_LEVEL=info
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+  await fs.writeFile(path.join(projectPath, '.env'), envExample);
+
+  // src/index.js - Main server file
+  const mainFile = `import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || 'localhost';
+
+// Middleware
+app.use(helmet()); // Security headers
+app.use(cors()); // CORS
+app.use(morgan('combined')); // Logging
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// API Routes
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'Welcome to your Node.js Express API',
+    version: '1.0.0',
+    endpoints: {
+      health: 'GET /health',
+      api: 'GET /api'
+    }
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: \`Route \${req.method} \${req.path} not found\`,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    error: err.name || 'Internal Server Error',
+    message: err.message || 'An unexpected error occurred',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Start server
+app.listen(PORT, HOST, () => {
+  console.log(\`✅ Server running at http://\${HOST}:\${PORT}\`);
+  console.log(\`📚 API Documentation: http://\${HOST}:\${PORT}/api/docs\`);
+  console.log(\`🏥 Health check: http://\${HOST}:\${PORT}/health\`);
+});
+
+export default app;
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'index.js'), mainFile);
+
+  // src/middleware/auth.js - JWT middleware example
+  await fs.ensureDir(path.join(projectPath, 'src', 'middleware'));
+  const authMiddleware = `import jwt from 'jsonwebtoken';
+
+export const verifyToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token', details: error.message });
+  }
+};
+`;
+
+  await fs.writeFile(
+    path.join(projectPath, 'src', 'middleware', 'auth.js'),
+    authMiddleware
+  );
+
+  // src/routes/users.js - Example route
+  await fs.ensureDir(path.join(projectPath, 'src', 'routes'));
+  const usersRoute = `import express from 'express';
+import { verifyToken } from '../middleware/auth.js';
+
+const router = express.Router();
+
+// Example protected route
+router.get('/', verifyToken, (req, res) => {
+  res.json({
+    message: 'Users list',
+    user: req.user,
+    data: []
+  });
+});
+
+router.get('/:id', verifyToken, (req, res) => {
+  res.json({
+    id: req.params.id,
+    name: 'Example User',
+    email: 'user@example.com'
+  });
+});
+
+export default router;
+`;
+
+  await fs.writeFile(
+    path.join(projectPath, 'src', 'routes', 'users.js'),
+    usersRoute
+  );
+
+  // src/config/database.js - Database config example
+  await fs.ensureDir(path.join(projectPath, 'src', 'config'));
+  const dbConfig = `import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export default prisma;
+`;
+
+  await fs.writeFile(
+    path.join(projectPath, 'src', 'config', 'database.js'),
+    dbConfig
+  );
+
+  // prisma/schema.prisma - Database schema
+  await fs.ensureDir(path.join(projectPath, 'prisma'));
+  const prismaSchema = `generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+  posts Post[]
+}
+
+model Post {
+  id    Int     @id @default(autoincrement())
+  title String
+  content String?
+  author User @relation(fields: [authorId], references: [id])
+  authorId Int
+}
+`;
+
+  await fs.writeFile(
+    path.join(projectPath, 'prisma', 'schema.prisma'),
+    prismaSchema
+  );
+
+  // .gitignore enhancements
+  const gitignoreContent = `.env
+.env.local
+node_modules/
+dist/
+.DS_Store
+*.log
+.vscode/
+.idea/
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignoreContent, { flag: 'a' });
 }
 
 async function generateFastAPI(projectPath, features) {
