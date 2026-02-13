@@ -50,6 +50,9 @@ export async function generateProject(projectPath, templateId, templateConfig, f
       case 'go-fiber':
         await generateGoFiber(projectPath, features);
         break;
+      case 'ai-saas-nextjs':
+        await generateAISaaS(projectPath, features);
+        break;
       // Add more template generators as needed
       default:
         console.log(`  ⚠️  No specific generator for ${templateId}, using basic structure...`);
@@ -1298,6 +1301,423 @@ func main() {
 }`;
 
   await fs.writeFile(path.join(projectPath, 'main.go'), mainGo);
+}
+
+async function generateAISaaS(projectPath, features) {
+  // Create Next.js specific structure
+  await fs.ensureDir(path.join(projectPath, 'src', 'app', 'api', 'chat'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'components'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'lib'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'hooks'));
+
+  // Enhanced package.json with OpenAI and AI dependencies
+  const packageJson = {
+    name: path.basename(projectPath),
+    version: '0.1.0',
+    scripts: {
+      dev: 'next dev',
+      build: 'next build',
+      start: 'next start',
+      lint: 'next lint',
+      ...(features.includes('testing') && { test: 'jest --watch' })
+    },
+    dependencies: {
+      next: '^14.0.0',
+      react: '^18.2.0',
+      'react-dom': '^18.2.0',
+      'openai': '^4.28.0',
+      'ai': '^3.0.0',
+      'tailwindcss': '^3.3.0',
+      'clsx': '^2.0.0',
+      'react-markdown': '^9.0.0',
+      'zustand': '^4.4.0'
+    },
+    devDependencies: {
+      'typescript': '^5.3.0',
+      '@types/react': '^18.2.0',
+      '@types/react-dom': '^18.2.0',
+      '@types/node': '^20.0.0',
+      'autoprefixer': '^10.4.0',
+      'postcss': '^8.4.0',
+      'tailwindcss': '^3.3.0',
+      ...(features.includes('linting') && {
+        'eslint': '^8.56.0',
+        'eslint-config-next': '^14.0.0',
+        'prettier': '^3.1.0'
+      }),
+      ...(features.includes('testing') && {
+        'jest': '^29.0.0',
+        '@testing-library/react': '^14.0.0',
+        '@testing-library/jest-dom': '^6.0.0'
+      })
+    }
+  };
+
+  await fs.writeFile(
+    path.join(projectPath, 'package.json'),
+    JSON.stringify(packageJson, null, 2)
+  );
+
+  // tsconfig.json
+  const tsConfig = {
+    compilerOptions: {
+      target: 'ES2020',
+      useDefineForClassFields: true,
+      lib: ['ES2020', 'DOM', 'DOM.Iterable'],
+      module: 'ESNext',
+      skipLibCheck: true,
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true,
+      strict: true,
+      noImplicitAny: true,
+      strictNullChecks: true,
+      strictFunctionTypes: true,
+      noUnusedLocals: true,
+      noUnusedParameters: true,
+      noImplicitReturns: true,
+      noFallthroughCasesInSwitch: true,
+      resolveJsonModule: true,
+      isolatedModules: true,
+      jsx: 'preserve',
+      incremental: true,
+      plugins: [{ name: 'next' }],
+      paths: {
+        '@/*': ['./src/*']
+      }
+    },
+    include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+    exclude: ['node_modules']
+  };
+
+  await fs.writeFile(
+    path.join(projectPath, 'tsconfig.json'),
+    JSON.stringify(tsConfig, null, 2)
+  );
+
+  // next.config.js
+  const nextConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  swcMinify: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
+};
+
+module.exports = nextConfig;
+`;
+
+  await fs.writeFile(path.join(projectPath, 'next.config.js'), nextConfig);
+
+  // tailwind.config.js
+  const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};
+`;
+
+  await fs.writeFile(path.join(projectPath, 'tailwind.config.js'), tailwindConfig);
+
+  // postcss.config.js
+  const postcssConfig = `module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+`;
+
+  await fs.writeFile(path.join(projectPath, 'postcss.config.js'), postcssConfig);
+
+  // src/app/layout.tsx (CRITICAL ROOT LAYOUT)
+  const layout = `import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'AI Chat Assistant',
+  description: 'Powered by OpenAI and built with Next.js 14',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+        <nav className="border-b border-gray-700 px-4 py-3 bg-gray-900 bg-opacity-50 backdrop-blur">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-2xl font-bold">🤖 AI Assistant</h1>
+          </div>
+        </nav>
+        <main className="max-w-7xl mx-auto">
+          {children}
+        </main>
+      </body>
+    </html>
+  );
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'app', 'layout.tsx'), layout);
+
+  // src/app/globals.css
+  const globalsCss = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+.message-enter {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'app', 'globals.css'), globalsCss);
+
+  // src/app/page.tsx (AI Chat Interface)
+  const page = `'use client';
+
+import { useState, useRef, useEffect } from 'react';
+
+interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: Date;
+}
+
+export default function ChatPage() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      content: "Hello! I'm an AI assistant powered by OpenAI. How can I help you today?",
+      role: 'assistant',
+      timestamp: new Date()
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: input,
+      role: 'user',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: messages.map(m => ({
+            role: m.role,
+            content: m.content
+          })).concat([{ role: 'user', content: input }])
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.message) {
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          content: data.message,
+          role: 'assistant',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-900">
+      {/* Chat Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={'message-enter flex ' + (message.role === 'user' ? 'justify-end' : 'justify-start')}
+          >
+            <div
+              className={'max-w-xs lg:max-w-md px-4 py-2 rounded-lg ' + (
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-100'
+              )}
+            >
+              {message.content}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-700 text-gray-100 px-4 py-2 rounded-lg">
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Field */}
+      <div className="border-t border-gray-700 bg-gray-800 p-4">
+        <form onSubmit={handleSendMessage} className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            disabled={loading}
+            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-semibold transition"
+          >
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'app', 'page.tsx'), page);
+
+  // src/app/api/chat/route.ts (Chat API Endpoint)
+  const chatRoute = `import { NextRequest, NextResponse } from 'next/server';
+import { OpenAI } from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const { messages } = await request.json();
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: messages,
+      max_tokens: 1024,
+      temperature: 0.7,
+    });
+
+    const message = response.choices[0]?.message?.content || 'I apologize, I could not generate a response.';
+
+    return NextResponse.json({ message });
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate response' },
+      { status: 500 }
+    );
+  }
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'app', 'api', 'chat', 'route.ts'), chatRoute);
+
+  // src/lib/openai.ts (OpenAI Client)
+  const openaiClient = `import { OpenAI } from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export default openai;
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'lib', 'openai.ts'), openaiClient);
+
+  // .env.example
+  const envExample = `# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Application
+NEXT_PUBLIC_APP_NAME=AI Chat Assistant
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+
+  // .env.local (git ignored copy)
+  await fs.writeFile(path.join(projectPath, '.env.local'), envExample);
+
+  // .gitignore additions
+  const gitignore = `.env
+.env.local
+.env.*.local
+node_modules/
+.next/
+dist/
+build/
+*.log
+.DS_Store
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignore, { flag: 'a' });
 }
 
 async function generateBasicStructure(projectPath, templateConfig) {
