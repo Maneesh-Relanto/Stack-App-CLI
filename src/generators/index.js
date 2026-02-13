@@ -387,7 +387,7 @@ async function generateNextJsSaas(projectPath, features) {
   await fs.ensureDir(path.join(projectPath, 'src', 'components'));
   await fs.ensureDir(path.join(projectPath, 'src', 'lib'));
 
-  // package.json
+  // Enhanced package.json with SaaS dependencies
   const packageJson = {
     name: path.basename(projectPath),
     version: '0.1.0',
@@ -395,12 +395,37 @@ async function generateNextJsSaas(projectPath, features) {
       dev: 'next dev',
       build: 'next build',
       start: 'next start',
-      lint: 'next lint'
+      lint: 'next lint',
+      ...(features.includes('testing') && { test: 'jest --watch' })
     },
     dependencies: {
       next: '^14.0.0',
       react: '^18.2.0',
-      'react-dom': '^18.2.0'
+      'react-dom': '^18.2.0',
+      '@supabase/supabase-js': '^2.38.0',
+      '@stripe/react-stripe-js': '^2.4.0',
+      '@stripe/stripe-js': '^2.1.0',
+      'tailwindcss': '^3.3.0',
+      'clsx': '^2.0.0'
+    },
+    devDependencies: {
+      'typescript': '^5.3.0',
+      '@types/react': '^18.2.0',
+      '@types/react-dom': '^18.2.0',
+      '@types/node': '^20.0.0',
+      'autoprefixer': '^10.4.0',
+      'postcss': '^8.4.0',
+      'tailwindcss': '^3.3.0',
+      ...(features.includes('linting') && {
+        'eslint': '^8.56.0',
+        'eslint-config-next': '^14.0.0',
+        'prettier': '^3.1.0'
+      }),
+      ...(features.includes('testing') && {
+        'jest': '^29.0.0',
+        '@testing-library/react': '^14.0.0',
+        '@testing-library/jest-dom': '^6.0.0'
+      })
     }
   };
 
@@ -409,16 +434,231 @@ async function generateNextJsSaas(projectPath, features) {
     JSON.stringify(packageJson, null, 2)
   );
 
-  // Simple page
-  const page = `export default function Home() {
-  return (
-    <main className="min-h-screen p-24">
-      <h1 className="text-4xl font-bold">Welcome to your SaaS!</h1>
-    </main>
+  // tsconfig.json
+  const tsConfig = {
+    compilerOptions: {
+      target: 'ES2020',
+      useDefineForClassFields: true,
+      lib: ['ES2020', 'DOM', 'DOM.Iterable'],
+      module: 'ESNext',
+      skipLibCheck: true,
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true,
+      strict: true,
+      noImplicitAny: true,
+      strictNullChecks: true,
+      strictFunctionTypes: true,
+      noUnusedLocals: true,
+      noUnusedParameters: true,
+      noImplicitReturns: true,
+      noFallthroughCasesInSwitch: true,
+      resolveJsonModule: true,
+      isolatedModules: true,
+      jsx: 'preserve',
+      incremental: true,
+      plugins: [{ name: 'next' }],
+      paths: {
+        '@/*': ['./src/*']
+      }
+    },
+    include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+    exclude: ['node_modules']
+  };
+
+  await fs.writeFile(
+    path.join(projectPath, 'tsconfig.json'),
+    JSON.stringify(tsConfig, null, 2)
   );
-}`;
+
+  // next.config.js
+  const nextConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  swcMinify: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
+};
+
+module.exports = nextConfig;
+`;
+
+  await fs.writeFile(path.join(projectPath, 'next.config.js'), nextConfig);
+
+  // tailwind.config.js
+  const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};
+`;
+
+  await fs.writeFile(path.join(projectPath, 'tailwind.config.js'), tailwindConfig);
+
+  // postcss.config.js
+  const postcssConfig = `module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+`;
+
+  await fs.writeFile(path.join(projectPath, 'postcss.config.js'), postcssConfig);
+
+  // src/app/layout.tsx (CRITICAL ROOT LAYOUT)
+  const layout = `import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'My SaaS Application',
+  description: 'Built with Next.js 14, TypeScript, Tailwind CSS, Stripe, and Supabase',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="bg-white text-gray-900">
+        <nav className="border-b border-gray-200 px-4 py-2">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-2xl font-bold">My SaaS</h1>
+          </div>
+        </nav>
+        <main className="max-w-7xl mx-auto">
+          {children}
+        </main>
+      </body>
+    </html>
+  );
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'app', 'layout.tsx'), layout);
+
+  // src/app/globals.css
+  const globalsCss = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'app', 'globals.css'), globalsCss);
+
+  // src/app/page.tsx (UPDATED)
+  const page = `'use client';
+
+import Link from 'next/link';
+
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto px-4 py-16">
+        <div className="text-center">
+          <h1 className="text-5xl font-bold text-gray-900 mb-4">
+            Welcome to your SaaS
+          </h1>
+          <p className="text-xl text-gray-600 mb-8">
+            Built with Next.js 14, TypeScript, Tailwind CSS, Stripe, and Supabase
+          </p>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold mb-2">🚀 Lightning Fast</h3>
+                <p className="text-gray-600">Built on Next.js 14 for optimal performance</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold mb-2">💳 Stripe Ready</h3>
+                <p className="text-gray-600">Accept payments and manage subscriptions</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold mb-2">🔐 Secure Database</h3>
+                <p className="text-gray-600">Powered by Supabase PostgreSQL</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-12">
+            <Link
+              href="#"
+              className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Get Started
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+`;
 
   await fs.writeFile(path.join(projectPath, 'src', 'app', 'page.tsx'), page);
+
+  // .env.example
+  const envExample = `# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+
+# Stripe Configuration
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key_here
+STRIPE_SECRET_KEY=your_stripe_secret_key_here
+
+# Application
+NEXT_PUBLIC_APP_NAME=My SaaS
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+
+  // .env.local (git ignored copy)
+  await fs.writeFile(path.join(projectPath, '.env.local'), envExample);
+
+  // src/lib/supabase.ts - Supabase client
+  const supabaseClient = `import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'lib', 'supabase.ts'), supabaseClient);
+
+  // .gitignore additions
+  const gitignore = `.env
+.env.local
+.env.*.local
+node_modules/
+.next/
+dist/
+build/
+*.log
+.DS_Store
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignore, { flag: 'a' });
 }
 
 async function generateReactVite(projectPath, features) {
