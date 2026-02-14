@@ -53,6 +53,9 @@ export async function generateProject(projectPath, templateId, templateConfig, f
       case 'ai-saas-nextjs':
         await generateAISaaS(projectPath, features);
         break;
+      case 'react-native-expo':
+        await generateReactNativeExpo(projectPath, features);
+        break;
       // Add more template generators as needed
       default:
         console.log(`  ⚠️  No specific generator for ${templateId}, using basic structure...`);
@@ -1730,6 +1733,371 @@ build/
 `;
 
   await fs.writeFile(path.join(projectPath, '.gitignore'), gitignore, { flag: 'a' });
+}
+
+async function generateReactNativeExpo(projectPath, features) {
+  // Generate package.json for Expo
+  const packageJson = {
+    name: path.basename(projectPath),
+    version: '0.1.0',
+    scripts: {
+      start: 'expo start',
+      android: 'expo start --android',
+      ios: 'expo start --ios',
+      web: 'expo start --web',
+      eject: 'expo eject',
+      ...(features.includes('testing') && { test: 'jest' })
+    },
+    dependencies: {
+      expo: '^49.0.0',
+      'expo-router': '^2.0.0',
+      'expo-splash-screen': '^0.20.0',
+      'expo-status-bar': '^1.6.0',
+      react: '18.2.0',
+      'react-native': '0.72.0',
+      'react-native-gesture-handler': '^2.14.0',
+      'react-native-screens': '^3.22.0',
+      'react-native-safe-area-context': '^4.6.0',
+      zustand: '^4.4.0',
+      '@supabase/supabase-js': '^2.38.0',
+      axios: '^1.6.0'
+    },
+    devDependencies: {
+      '@babel/core': '^7.23.0',
+      '@types/react': '^18.2.0',
+      typescript: '^5.3.0',
+      ...(features.includes('linting') && {
+        eslint: '^8.56.0',
+        prettier: '^3.1.0'
+      }),
+      ...(features.includes('testing') && {
+        jest: '^29.7.0',
+        '@babel/preset-env': '^7.23.0',
+        '@babel/preset-typescript': '^7.23.0'
+      })
+    }
+  };
+
+  await fs.writeFile(
+    path.join(projectPath, 'package.json'),
+    JSON.stringify(packageJson, null, 2)
+  );
+
+  // Generate app.json for Expo configuration
+  const appJson = {
+    expo: {
+      name: path.basename(projectPath),
+      slug: path.basename(projectPath).toLowerCase().replace(/[^a-z0-9-]/g, ''),
+      version: '0.1.0',
+      orientation: 'portrait',
+      icon: './assets/icon.png',
+      userInterfaceStyle: 'light',
+      splash: {
+        image: './assets/splash.png',
+        resizeMode: 'contain',
+        backgroundColor: '#ffffff'
+      },
+      assetBundlePatterns: ['**/*'],
+      ios: {
+        supportsTabletMode: true,
+        bundleIdentifier: `com.${path.basename(projectPath).replace(/[-]/g, '')}`
+      },
+      android: {
+        adaptiveIcon: {
+          foregroundImage: './assets/adaptive-icon.png',
+          backgroundColor: '#ffffff'
+        },
+        package: `com.${path.basename(projectPath).replace(/[-]/g, '')}`
+      },
+      web: {
+        favicon: './assets/favicon.png'
+      },
+      plugins: ['expo-router']
+    }
+  };
+
+  await fs.writeFile(
+    path.join(projectPath, 'app.json'),
+    JSON.stringify(appJson, null, 2)
+  );
+
+  // Create directory structure
+  await fs.ensureDir(path.join(projectPath, 'app'));
+  await fs.ensureDir(path.join(projectPath, 'app', '(tabs)'));
+  await fs.ensureDir(path.join(projectPath, 'src'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'lib'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'store'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'hooks'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'components'));
+  await fs.ensureDir(path.join(projectPath, 'assets'));
+
+  // Create root layout file
+  const rootLayout = `import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import { Stack } from 'expo-router';
+
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
+  return (
+    <>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style="auto" />
+    </>
+  );
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', '_layout.tsx'), rootLayout);
+
+  // Create tabs layout
+  const tabsLayout = `import { Tabs } from 'expo-router';
+
+export default function TabsLayout() {
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#2563eb',
+        headerShown: true,
+        headerTitleStyle: { fontWeight: 'bold' }
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarLabel: 'Home',
+          headerTitle: 'Welcome'
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarLabel: 'Settings',
+          headerTitle: 'Settings'
+        }}
+      />
+    </Tabs>
+  );
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', '(tabs)', '_layout.tsx'), tabsLayout);
+
+  // Create home screen
+  const homeScreen = `import { View, Text, StyleSheet, ScrollView } from 'react-native';
+
+export default function HomeScreen() {
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>📱 React Native Expo</Text>
+        <Text style={styles.subtitle}>Cross-platform mobile app</Text>
+        <Text style={styles.description}>
+          Built with Expo, React Navigation, and Zustand state management.
+        </Text>
+        <View style={styles.features}>
+          <Text style={styles.featureTitle}>Features:</Text>
+          <Text style={styles.feature}>✅ Expo Router navigation</Text>
+          <Text style={styles.feature}>✅ Zustand state management</Text>
+          <Text style={styles.feature}>✅ Supabase integration</Text>
+          <Text style={styles.feature}>✅ TypeScript support</Text>
+          <Text style={styles.feature}>✅ Responsive design</Text>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff'
+  },
+  content: {
+    padding: 20,
+    paddingTop: 30
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 8
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 16
+  },
+  description: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 22,
+    marginBottom: 24
+  },
+  features: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee'
+  },
+  featureTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12
+  },
+  feature: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
+    paddingLeft: 10
+  }
+});
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', '(tabs)', 'index.tsx'), homeScreen);
+
+  // Create settings screen
+  const settingsScreen = `import { View, Text, StyleSheet, Switch, ScrollView } from 'react-native';
+import { useAppStore } from '../../src/store/appStore';
+
+export default function SettingsScreen() {
+  const { isDarkMode, toggleDarkMode } = useAppStore();
+
+  return (
+    <ScrollView style={[styles.container, isDarkMode && styles.dark]}>
+      <View style={styles.content}>
+        <View style={styles.setting}>
+          <Text style={[styles.label, isDarkMode && styles.darkText]}>Dark Mode</Text>
+          <Switch value={isDarkMode} onValueChange={toggleDarkMode} />
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff'
+  },
+  dark: {
+    backgroundColor: '#1a1a1a'
+  },
+  content: {
+    padding: 20
+  },
+  setting: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  label: {
+    fontSize: 16,
+    color: '#333'
+  },
+  darkText: {
+    color: '#fff'
+  }
+});
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', '(tabs)', 'settings.tsx'), settingsScreen);
+
+  // Create Zustand store
+  const zustandStore = `import { create } from 'zustand';
+
+interface AppStore {
+  isDarkMode: boolean;
+  isLoading: boolean;
+  user: any | null;
+  toggleDarkMode: () => void;
+  setLoading: (loading: boolean) => void;
+  setUser: (user: any) => void;
+}
+
+export const useAppStore = create<AppStore>((set) => ({
+  isDarkMode: false,
+  isLoading: false,
+  user: null,
+  toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+  setLoading: (loading) => set({ isLoading: loading }),
+  setUser: (user) => set({ user })
+}));
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'store', 'appStore.ts'), zustandStore);
+
+  // Create Supabase client
+  const supabaseClient = `import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+
+export const supabase = createClient(supabaseUrl, anonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: false,
+    detectSessionInUrl: false
+  }
+});
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'lib', 'supabase.ts'), supabaseClient);
+
+  // Create tsconfig.json
+  const tsConfig = {
+    compilerOptions: {
+      target: 'ES2020',
+      useDefineForClassFields: true,
+      lib: ['ES2020'],
+      module: 'ESNext',
+      moduleResolution: 'bundler',
+      skipLibCheck: true,
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true,
+      strict: true,
+      noImplicitAny: true,
+      strictNullChecks: true,
+      strictFunctionTypes: true,
+      noUnusedLocals: false,
+      noUnusedParameters: false,
+      noImplicitReturns: true,
+      noFallthroughCasesInSwitch: true,
+      resolveJsonModule: true,
+      isolatedModules: true,
+      jsx: 'react-jsx'
+    },
+    include: ['app', 'src'],
+    exclude: ['node_modules']
+  };
+
+  await fs.writeFile(
+    path.join(projectPath, 'tsconfig.json'),
+    JSON.stringify(tsConfig, null, 2)
+  );
+
+  // Create .env.example
+  const envExample = `# Supabase Configuration
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url_here
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+
+  // Create .env.local (git ignored)
+  await fs.writeFile(path.join(projectPath, '.env.local'), envExample);
 }
 
 async function generateBasicStructure(projectPath, templateConfig) {
