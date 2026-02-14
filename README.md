@@ -36,11 +36,10 @@ npx create-stack-app list
 
 ## 📚 Documentation
 
-Get started quickly and learn what each template offers:
-
-- **[QUICK_START.md](QUICK_START.md)** - Step-by-step guide to generate and use projects
-- **[TEMPLATES_GUIDE.md](TEMPLATES_GUIDE.md)** - Detailed reference for all 15 templates
-- **[generated-samples/](generated-samples/)** - Real working examples of each template
+**New to Create Stack App?** Start here:
+- 👉 **[QUICK_START_GUIDE.md](QUICK_START_GUIDE.md)** - 60-second setup guide
+- 👉 **[TEMPLATES_GUIDE.md](TEMPLATES_GUIDE.md)** - All 15 templates explained
+- 👉 **[generated-samples/](generated-samples/)** - Real working code examples
 
 ## 🏗️ Available Templates
 
