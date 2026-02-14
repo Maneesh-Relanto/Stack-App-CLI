@@ -32,6 +32,7 @@ npx create-stack-app list
 ## 📚 Documentation
 
 Start here:
+- **[ABOUT.md](ABOUT.md)** - What this project is about and why it exists
 - **[QUICK_START_GUIDE.md](QUICK_START_GUIDE.md)** - 60-second setup guide
 - **[TEMPLATES_GUIDE.md](TEMPLATES_GUIDE.md)** - All 15 templates explained
 - **[generated-samples/](generated-samples/)** - Real working code examples
