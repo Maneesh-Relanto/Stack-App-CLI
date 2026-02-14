@@ -59,6 +59,9 @@ export async function generateProject(projectPath, templateId, templateConfig, f
       case 'django-pro':
         await generateDjangoPro(projectPath, features);
         break;
+      case 'flask-api':
+        await generateFlaskAPI(projectPath, features);
+        break;
       // Add more template generators as needed
       default:
         console.log(`  ⚠️  No specific generator for ${templateId}, using basic structure...`);
@@ -2599,6 +2602,346 @@ local_settings.py
 .pytest_cache/
 .coverage
 htmlcov/
+
+# OS
+.DS_Store
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignorePy);
+}
+
+async function generateFlaskAPI(projectPath, features) {
+  // Generate requirements.txt
+  const requirementsTxt = `Flask==3.0.0
+Flask-RESTful==0.3.10
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+Flask-CORS==4.0.0
+python-dotenv==1.0.0
+flask-jwt-extended==4.5.3
+sqlalchemy==2.0.23
+marshmallow==3.20.1
+psycopg2-binary==2.9.9
+Werkzeug==3.0.1
+pytest==7.4.3
+pytest-flask==1.3.0
+`;
+
+  await fs.writeFile(path.join(projectPath, 'requirements.txt'), requirementsTxt);
+
+  // Create directory structure
+  await fs.ensureDir(path.join(projectPath, 'app'));
+  await fs.ensureDir(path.join(projectPath, 'app', 'api', 'v1'));
+  await fs.ensureDir(path.join(projectPath, 'app', 'models'));
+  await fs.ensureDir(path.join(projectPath, 'app', 'schemas'));
+  await fs.ensureDir(path.join(projectPath, 'tests'));
+
+  // Generate app/__init__.py
+  const appInitPy = `from flask import Flask
+from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
+db = SQLAlchemy()
+migrate = Migrate()
+
+
+def create_app(config_name='development'):
+    """Application factory"""
+    app = Flask(__name__)
+    
+    # Load configuration
+    if config_name == 'development':
+        app.config.from_object('config.DevelopmentConfig')
+    elif config_name == 'production':
+        app.config.from_object('config.ProductionConfig')
+    else:
+        app.config.from_object('config.DevelopmentConfig')
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    CORS(app)
+    
+    # Register blueprints
+    from app.api.v1 import api_bp
+    app.register_blueprint(api_bp, url_prefix='/api/v1')
+    
+    # CLI commands
+    @app.shell_context_processor
+    def make_shell_context():
+        return {'db': db}
+    
+    return app
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', '__init__.py'), appInitPy);
+
+  // Generate config.py
+  const configPy = `import os
+from datetime import timedelta
+
+
+class BaseConfig:
+    """Base configuration"""
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your-secret-key')
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
+
+
+class DevelopmentConfig(BaseConfig):
+    """Development configuration"""
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'DATABASE_URL',
+        'postgresql://user:password@localhost:5432/db'
+    )
+    SQLALCHEMY_ECHO = True
+
+
+class ProductionConfig(BaseConfig):
+    """Production configuration"""
+    DEBUG = False
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    SQLALCHEMY_ECHO = False
+
+
+config = {
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'default': DevelopmentConfig
+}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'config.py'), configPy);
+
+  // Generate wsgi.py
+  const wsgiPy = `import os
+from app import create_app, db
+
+app = create_app(os.getenv('FLASK_ENV', 'production'))
+
+
+@app.shell_context_processor
+def make_shell_context():
+    return {'db': db}
+
+
+if __name__ == '__main__':
+    app.run()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'wsgi.py'), wsgiPy);
+
+  // Generate manage.py
+  const managePy = `import os
+from app import create_app, db
+from flask_migrate import MigrateCommand
+from flask_script import Manager
+
+app = create_app(os.getenv('FLASK_ENV', 'development'))
+manager = Manager(app)
+manager.add_command('db', MigrateCommand)
+
+
+@manager.command
+def create_admin():
+    """Create a new admin user."""
+    pass
+
+
+if __name__ == '__main__':
+    manager.run()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'manage.py'), managePy);
+
+  // Generate API blueprint structure
+  await fs.writeFile(path.join(projectPath, 'app', 'api', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'app', 'api', 'v1', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'app', 'models', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'app', 'schemas', '__init__.py'), '');
+
+  // Generate API blueprint
+  const apiV1InitPy = `from flask import Blueprint
+from app.api.v1 import health
+
+api_bp = Blueprint('api', __name__)
+api_bp.register_blueprint(health.bp)
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', 'api', 'v1', '__init__.py'), apiV1InitPy);
+
+  // Generate health endpoint
+  const healthBlueprintPy = `from flask import Blueprint, jsonify
+
+bp = Blueprint('health', __name__)
+
+
+@bp.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'version': '0.1.0'
+    }), 200
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', 'api', 'v1', 'health.py'), healthBlueprintPy);
+
+  // Generate base model
+  const baseModelPy = `from app import db
+from datetime import datetime
+
+
+class BaseModel(db.Model):
+    """Base model with common fields"""
+    __abstract__ = True
+    
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+`;
+
+  await fs.writeFile(path.join(projectPath, 'app', 'models', 'base.py'), baseModelPy);
+
+  // Generate .env.example
+  const envExample = `# Flask Configuration
+FLASK_APP=wsgi.py
+FLASK_ENV=development
+DEBUG=True
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/flask_db
+
+# JWT
+JWT_SECRET_KEY=your-secret-key-change-in-production
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+  await fs.writeFile(path.join(projectPath, '.env'), envExample);
+
+  // Generate pytest.ini
+  const pytestIni = `[pytest]
+testpaths = tests
+python_files = test_*.py
+addopts = -v --tb=short
+`;
+
+  await fs.writeFile(path.join(projectPath, 'pytest.ini'), pytestIni);
+
+  // Generate conftest.py
+  const conftestPy = `import pytest
+from app import create_app, db
+
+
+@pytest.fixture
+def app():
+    """Create app for testing"""
+    app = create_app('development')
+    
+    with app.app_context():
+        db.create_all()
+        yield app
+        db.session.remove()
+        db.drop_all()
+
+
+@pytest.fixture
+def client(app):
+    """Test client"""
+    return app.test_client()
+
+
+@pytest.fixture
+def runner(app):
+    """CLI runner"""
+    return app.test_cli_runner()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'tests', 'conftest.py'), conftestPy);
+
+  // Generate test example
+  const testHealthPy = `def test_health_check(client):
+    """Test health check endpoint"""
+    response = client.get('/api/v1/health')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['status'] == 'healthy'
+    assert 'version' in data
+`;
+
+  await fs.writeFile(path.join(projectPath, 'tests', 'test_health.py'), testHealthPy);
+
+  // Generate run.py (simple entry point)
+  const runPy = `import os
+from dotenv import load_dotenv
+from app import create_app
+
+load_dotenv()
+
+app = create_app(os.getenv('FLASK_ENV', 'development'))
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+`;
+
+  await fs.writeFile(path.join(projectPath, 'run.py'), runPy);
+
+  // Generate .gitignore
+  const gitignorePy = `# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+instance/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Flask
+instance/
 
 # OS
 .DS_Store
