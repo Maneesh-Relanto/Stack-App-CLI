@@ -1,0 +1,76 @@
+package views
+
+templ Home() {
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Go HTMX App</title>
+        <script src="https://unpkg.com/htmx.org"></script>
+        <style>
+            body { font-family: sans-serif; margin: 2em; }
+            .container { max-width: 700px; margin: 0 auto; }
+            form { margin: 1em 0; padding: 1em; border: 1px solid #ddd; border-radius: 4px; }
+            input, textarea { display: block; width: 100%; margin: 0.5em 0; padding: 0.5em; }
+            button { padding: 0.5em 1em; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+            button:hover { background: #0056b3; }
+            .item { padding: 1em; margin: 0.5em 0; border: 1px solid #e0e0e0; border-radius: 4px; }
+            .item-actions { margin-top: 0.5em; }
+            .item-actions button { margin-right: 0.5em; padding: 0.25em 0.5em; font-size: 0.9em; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>📝 Go HTMX App</h1>
+            
+            <div>
+                <h2>Add New Item</h2>
+                <form hx-post="/items" hx-target="#items">
+                    <input type="text" name="title" placeholder="Title" required />
+                    <textarea name="description" placeholder="Description"></textarea>
+                    <button type="submit">Add Item</button>
+                </form>
+            </div>
+            
+            <div>
+                <h2>Items</h2>
+                <div id="items" hx-get="/items" hx-trigger="load">
+                    <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+}
+
+templ ItemList(items []Item) {
+    { for i, item := range items { }
+        <div class="item" id={ "item-" + item.ID }>
+            <h3>{ item.Title }</h3>
+            <p>{ item.Description }</p>
+            <div class="item-actions">
+                <button hx-get={ "/items/" + item.ID + "/edit" } hx-target={ "#item-" + item.ID } hx-swap="outerHTML">Edit</button>
+                <button hx-delete={ "/items/" + item.ID } hx-confirm="Are you sure?" hx-target={ "#item-" + item.ID } hx-swap="outerHTML swap:1s">Delete</button>
+            </div>
+        </div>
+    { } }
+}
+
+templ ItemDetail(item Item) {
+    <div class="item" id={ "item-" + item.ID }>
+        <h3>{ item.Title }</h3>
+        <p>{ item.Description }</p>
+        <div class="item-actions">
+            <button hx-get={ "/items/" + item.ID + "/edit" } hx-target={ "#item-" + item.ID } hx-swap="outerHTML">Edit</button>
+            <button hx-delete={ "/items/" + item.ID } hx-confirm="Are you sure?" hx-target={ "#item-" + item.ID } hx-swap="outerHTML swap:1s">Delete</button>
+        </div>
+    </div>
+}
+
+templ EditItemForm(item Item) {
+    <form hx-put={ "/items/" + item.ID } hx-target={ "#item-" + item.ID } hx-swap="outerHTML" id={ "item-" + item.ID }>
+        <input type="text" name="title" value={ item.Title } required />
+        <textarea name="description">{ item.Description }</textarea>
+        <button type="submit">Update Item</button>
+        <button type="button" hx-get={ "/items/" + item.ID } hx-target={ "#item-" + item.ID } hx-swap="outerHTML">Cancel</button>
+    </form>
+}

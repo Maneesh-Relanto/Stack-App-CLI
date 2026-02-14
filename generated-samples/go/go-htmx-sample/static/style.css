@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[hx-request] {
+    opacity: 0.6;
+}
