@@ -2229,31 +2229,465 @@ go 1.21
 
 require (
     github.com/gofiber/fiber/v2 v2.51.0
+    github.com/google/uuid v1.6.0
     github.com/joho/godotenv v1.5.1
 )`;
 
   await fs.writeFile(path.join(projectPath, 'go.mod'), goMod);
 
+  // Create directory structure
+  await fs.ensureDir(path.join(projectPath, 'handlers'));
+  await fs.ensureDir(path.join(projectPath, 'models'));
+  await fs.ensureDir(path.join(projectPath, 'middleware'));
+  await fs.ensureDir(path.join(projectPath, 'config'));
+
+  // Main application
   const mainGo = `package main
 
 import (
-    "github.com/gofiber/fiber/v2"
     "log"
+    "os"
+    "github.com/gofiber/fiber/v2"
+    "github.com/gofiber/fiber/v2/middleware/logger"
+    "github.com/joho/godotenv"
+    "myapp/config"
+    "myapp/handlers"
+    "myapp/middleware"
 )
 
 func main() {
-    app := fiber.New()
+    // Load environment variables
+    godotenv.Load()
 
-    app.Get("/", func(c *fiber.Ctx) error {
-        return c.JSON(fiber.Map{
-            "message": "Hello, World!",
+    // Create Fiber app with config
+    app := fiber.New(fiber.Config{
+        AppName: "Go Fiber API",
+        ErrorHandler: middleware.ErrorHandler,
+    })
+
+    // Global middleware
+    app.Use(logger.New())
+    app.Use(middleware.CORSMiddleware())
+    app.Use(middleware.RequestIDMiddleware())
+
+    // Health check
+    app.Get("/health", handlers.HealthCheck)
+    app.Get("/info", handlers.InfoHandler)
+
+    // API routes
+    api := app.Group("/api/v1")
+    api.Get("/items", handlers.GetItems)
+    api.Post("/items", handlers.CreateItem)
+    api.Get("/items/:id", handlers.GetItem)
+    api.Put("/items/:id", handlers.UpdateItem)
+    api.Delete("/items/:id", handlers.DeleteItem)
+
+    // 404 handler
+    app.Use(func(c *fiber.Ctx) error {
+        return c.Status(404).JSON(fiber.Map{
+            "error": "Route not found",
+            "path": c.Path(),
         })
     })
 
-    log.Fatal(app.Listen(":3000"))
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "3000"
+    }
+
+    log.Println("🚀 Server running on port " + port)
+    if err := app.Listen(":" + port); err != nil {
+        log.Panic(err)
+    }
 }`;
 
   await fs.writeFile(path.join(projectPath, 'main.go'), mainGo);
+
+  // Models
+  const modelsGo = `package models
+
+type Item struct {
+    ID          string \`json:"id"\`
+    Title       string \`json:"title"\`
+    Description string \`json:"description"\`
+}
+
+type CreateItemRequest struct {
+    Title       string \`json:"title" validate:"required"\`
+    Description string \`json:"description"\`
+}
+
+type ErrorResponse struct {
+    Error   string \`json:"error"\`
+    Message string \`json:"message"\`
+    Path    string \`json:"path"\`
+}`;
+
+  await fs.ensureDir(path.join(projectPath, 'models'));
+  await fs.writeFile(path.join(projectPath, 'models', 'models.go'), modelsGo);
+
+  // Handlers
+  const handlersGo = `package handlers
+
+import (
+    "log"
+    "github.com/gofiber/fiber/v2"
+    "github.com/google/uuid"
+    "myapp/models"
+)
+
+// In-memory storage (replace with database in production)
+var items []models.Item
+
+func init() {
+    items = []models.Item{
+        {ID: "1", Title: "Sample Item", Description: "A sample item"},
+    }
+}
+
+func HealthCheck(c *fiber.Ctx) error {
+    return c.JSON(fiber.Map{
+        "status": "healthy",
+        "service": "Go Fiber API",
+    })
+}
+
+func InfoHandler(c *fiber.Ctx) error {
+    return c.JSON(fiber.Map{
+        "name": "Go Fiber API",
+        "version": "0.1.0",
+        "description": "RESTful API built with Go Fiber",
+    })
+}
+
+func GetItems(c *fiber.Ctx) error {
+    return c.JSON(fiber.Map{
+        "items": items,
+        "count": len(items),
+    })
+}
+
+func GetItem(c *fiber.Ctx) error {
+    id := c.Params("id")
+    
+    for _, item := range items {
+        if item.ID == id {
+            return c.JSON(item)
+        }
+    }
+    
+    return c.Status(404).JSON(fiber.Map{
+        "error": "Item not found",
+    })
+}
+
+func CreateItem(c *fiber.Ctx) error {
+    req := new(models.CreateItemRequest)
+    
+    if err := c.BodyParser(req); err != nil {
+        return c.Status(400).JSON(fiber.Map{
+            "error": "Invalid request body",
+        })
+    }
+    
+    item := models.Item{
+        ID: uuid.New().String(),
+        Title: req.Title,
+        Description: req.Description,
+    }
+    
+    items = append(items, item)
+    
+    return c.Status(201).JSON(item)
+}
+
+func UpdateItem(c *fiber.Ctx) error {
+    id := c.Params("id")
+    req := new(models.CreateItemRequest)
+    
+    if err := c.BodyParser(req); err != nil {
+        return c.Status(400).JSON(fiber.Map{
+            "error": "Invalid request body",
+        })
+    }
+    
+    for i, item := range items {
+        if item.ID == id {
+            items[i].Title = req.Title
+            items[i].Description = req.Description
+            return c.JSON(items[i])
+        }
+    }
+    
+    return c.Status(404).JSON(fiber.Map{
+        "error": "Item not found",
+    })
+}
+
+func DeleteItem(c *fiber.Ctx) error {
+    id := c.Params("id")
+    
+    for i, item := range items {
+        if item.ID == id {
+            items = append(items[:i], items[i+1:]...)
+            return c.SendStatus(204)
+        }
+    }
+    
+    return c.Status(404).JSON(fiber.Map{
+        "error": "Item not found",
+    })
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'handlers', 'handlers.go'), handlersGo);
+
+  // Middleware
+  const middlewareGo = `package middleware
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "github.com/google/uuid"
+)
+
+func ErrorHandler(c *fiber.Ctx, err error) error {
+    code := 500
+    if e, ok := err.(*fiber.Error); ok {
+        code = e.Code
+    }
+    
+    return c.Status(code).JSON(fiber.Map{
+        "error": err.Error(),
+        "status": code,
+    })
+}
+
+func CORSMiddleware() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        c.Set("Access-Control-Allow-Origin", "*")
+        c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        c.Set("Access-Control-Allow-Headers", "Content-Type")
+        
+        if c.Method() == "OPTIONS" {
+            return c.SendStatus(200)
+        }
+        
+        return c.Next()
+    }
+}
+
+func RequestIDMiddleware() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        requestID := c.Get("X-Request-ID")
+        if requestID == "" {
+            requestID = uuid.New().String()
+        }
+        
+        c.Locals("requestID", requestID)
+        c.Set("X-Request-ID", requestID)
+        
+        return c.Next()
+    }
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'middleware', 'middleware.go'), middlewareGo);
+
+  // Config
+  const configGo = `package config
+
+import (
+    "os"
+)
+
+type Config struct {
+    Port     string
+    AppName  string
+    LogLevel string
+}
+
+func Load() *Config {
+    return &Config{
+        Port:     getEnv("PORT", "3000"),
+        AppName:  getEnv("APP_NAME", "Go Fiber API"),
+        LogLevel: getEnv("LOG_LEVEL", "info"),
+    }
+}
+
+func getEnv(key, defaultValue string) string {
+    value := os.Getenv(key)
+    if value == "" {
+        return defaultValue
+    }
+    return value
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'config', 'config.go'), configGo);
+
+  // .env.example
+  const envExample = `# Server Configuration
+PORT=3000
+APP_NAME=Go Fiber API
+LOG_LEVEL=info
+
+# Environment
+ENVIRONMENT=development
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+  await fs.writeFile(path.join(projectPath, '.env'), envExample);
+
+  // README
+  const readmeMd = `# Go Fiber REST API
+
+A modern, efficient REST API built with Go Fiber framework.
+
+## Features
+
+- ⚡ Ultra-fast response times with Fiber
+- 🔄 RESTful API with CRUD operations
+- 🛡️ CORS middleware support
+- 📝 Request logging and tracing
+- 🆔 Unique request IDs
+- 📦 Modular architecture
+- 🚀 Production-ready
+
+## Quick Start
+
+### Prerequisites
+
+- Go 1.21+
+- Git
+
+### Setup
+
+\`\`\`bash
+# Clone and navigate
+cd your-project
+
+# Download dependencies
+go mod download
+
+# Run the server
+go run main.go
+\`\`\`
+
+Server runs on \`http://localhost:3000\`
+
+### Build for Production
+
+\`\`\`bash
+go build -o app main.go
+./app
+\`\`\`
+
+## API Endpoints
+
+### Health
+- \`GET /health\` - Health check
+- \`GET /info\` - Service information
+
+### Items (CRUD)
+- \`GET /api/v1/items\` - List all items
+- \`POST /api/v1/items\` - Create item
+- \`GET /api/v1/items/:id\` - Get item by ID
+- \`PUT /api/v1/items/:id\` - Update item
+- \`DELETE /api/v1/items/:id\` - Delete item
+
+## Project Structure
+
+\`\`\`
+.
+├── main.go           # Application entry point
+├── go.mod            # Go module file
+├── handlers/         # HTTP handlers
+├── models/           # Data models
+├── middleware/       # Custom middleware
+├── config/           # Configuration
+├── .env.example      # Example environment variables
+└── README.md         # This file
+\`\`\`
+
+## License
+
+MIT
+`;
+
+  await fs.writeFile(path.join(projectPath, 'README.md'), readmeMd);
+
+  // .gitignore
+  const gitignore = `# Binaries and executable files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Go related
+*.go.bak
+*.mod.bak
+
+# Dependent modules
+/vendor/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Build artifacts
+app
+*.out
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignore);
+
+  // Dockerfile
+  const dockerfile = `FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
+
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+
+COPY --from=builder /app/app .
+
+EXPOSE 3000
+
+CMD ["./app"]
+`;
+
+  await fs.writeFile(path.join(projectPath, 'Dockerfile'), dockerfile);
+
+  // Docker Compose
+  const dockerCompose = `version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - APP_NAME=Go Fiber API
+      - LOG_LEVEL=info
+`;
+
+  await fs.writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
 }
 
 async function generateAISaaS(projectPath, features) {
