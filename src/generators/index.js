@@ -62,6 +62,9 @@ export async function generateProject(projectPath, templateId, templateConfig, f
       case 'flask-api':
         await generateFlaskAPI(projectPath, features);
         break;
+      case 'python-ml-api':
+        await generatePythonMLAPI(projectPath, features);
+        break;
       // Add more template generators as needed
       default:
         console.log(`  ⚠️  No specific generator for ${templateId}, using basic structure...`);
@@ -2942,6 +2945,495 @@ htmlcov/
 
 # Flask
 instance/
+
+# OS
+.DS_Store
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignorePy);
+}
+
+async function generatePythonMLAPI(projectPath, features) {
+  // Generate requirements.txt for ML API
+  const requirementsTxt = `fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+numpy==1.26.2
+scipy==1.11.4
+scikit-learn==1.3.2
+tensorflow==2.14.0
+torch==2.1.1
+torchvision==0.16.1
+mlflow==2.10.0
+redis==5.0.1
+python-dotenv==1.0.0
+python-multipart==0.0.6
+pillow==10.1.0
+httpx==0.25.1
+pytest==7.4.3
+pytest-asyncio==0.21.1
+`;
+
+  await fs.writeFile(path.join(projectPath, 'requirements.txt'), requirementsTxt);
+
+  // Create directory structure
+  await fs.ensureDir(path.join(projectPath, 'src', 'api', 'v1', 'endpoints'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'core'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'ml', 'models'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'ml', 'preprocessing'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'db'));
+  await fs.ensureDir(path.join(projectPath, 'models'));
+  await fs.ensureDir(path.join(projectPath, 'tests'));
+
+  // Generate main.py
+  const mainPy = `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+from src.api.v1.api import api_router
+from src.core.config import settings
+
+logging.basicConfig(level=settings.LOG_LEVEL)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version="0.1.0",
+    description="Machine Learning API with TensorFlow/PyTorch inference"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_HOSTS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "ml_api": True}
+
+
+@app.get("/info", tags=["Info"])
+async def model_info():
+    """Get ML model information"""
+    return {
+        "name": "ML API",
+        "version": "0.1.0",
+        "capabilities": ["image_classification", "text_analysis", "predictions"]
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+`;
+
+  await fs.writeFile(path.join(projectPath, 'main.py'), mainPy);
+
+  // Generate config
+  const configPy = `import os
+from typing import List
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """Application settings"""
+    
+    PROJECT_NAME: str = "ML API"
+    API_V1_STR: str = "/api/v1"
+    
+    # Model Configuration
+    MODEL_PATH: str = os.getenv("MODEL_PATH", "./models")
+    MODEL_NAME: str = os.getenv("MODEL_NAME", "default_model")
+    USE_GPU: bool = os.getenv("USE_GPU", "False") == "True"
+    
+    # Framework
+    ML_FRAMEWORK: str = os.getenv("ML_FRAMEWORK", "tensorflow")  # tensorflow or pytorch
+    
+    # Cache
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+    CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "False") == "True"
+    
+    # MLflow
+    MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    MLFLOW_ENABLED: bool = os.getenv("MLFLOW_ENABLED", "False") == "True"
+    
+    # Security
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key")
+    
+    # CORS
+    ALLOWED_HOSTS: List[str] = ["*"]
+    
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+
+settings = Settings()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'core', 'config.py'), configPy);
+
+  // Generate model loader
+  const modelLoaderPy = `import os
+import logging
+from typing import Optional
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+
+class ModelLoader:
+    """Load and manage ML models"""
+    
+    _instance = None
+    _model = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def load_model(self, framework: str = "tensorflow", model_path: str = None):
+        """Load model based on framework"""
+        if self._model is not None:
+            return self._model
+        
+        try:
+            if framework == "tensorflow":
+                import tensorflow as tf
+                self._model = tf.keras.models.load_model(model_path or "model.h5")
+                logger.info("TensorFlow model loaded")
+            elif framework == "pytorch":
+                import torch
+                self._model = torch.load(model_path or "model.pt")
+                logger.info("PyTorch model loaded")
+            else:
+                logger.warning(f"Unknown framework: {framework}")
+        except Exception as e:
+            logger.error(f"Failed to load model: {e}")
+            self._model = None
+        
+        return self._model
+    
+    def get_model(self):
+        """Get loaded model"""
+        return self._model
+    
+    def predict(self, data: np.ndarray) -> np.ndarray:
+        """Run inference on model"""
+        if self._model is None:
+            raise RuntimeError("Model not loaded")
+        
+        try:
+            result = self._model.predict(data)
+            return result
+        except Exception as e:
+            logger.error(f"Prediction failed: {e}")
+            raise
+
+
+model_loader = ModelLoader()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'ml', 'model_loader.py'), modelLoaderPy);
+
+  // Generate preprocessing
+  const preprocessingPy = `import numpy as np
+from typing import List, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class DataPreprocessor:
+    """Data preprocessing utilities"""
+    
+    @staticmethod
+    def normalize(data: np.ndarray, mean: float = 0, std: float = 1) -> np.ndarray:
+        """Normalize data"""
+        return (data - mean) / std
+    
+    @staticmethod
+    def resize_image(image: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+        """Resize image to target size"""
+        try:
+            from PIL import Image
+            img = Image.fromarray(image)
+            img = img.resize(size)
+            return np.array(img)
+        except Exception as e:
+            logger.error(f"Image resize failed: {e}")
+            raise
+    
+    @staticmethod
+    def batch_process(data_list: List[np.ndarray]) -> np.ndarray:
+        """Process list of data into batch"""
+        return np.stack(data_list, axis=0)
+
+
+preprocessor = DataPreprocessor()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'ml', 'preprocessing', 'preprocessor.py'), preprocessingPy);
+
+  // Generate __init__ files
+  await fs.writeFile(path.join(projectPath, 'src', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'core', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'db', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'ml', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'ml', 'models', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'ml', 'preprocessing', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'api', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', 'endpoints', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'tests', '__init__.py'), '');
+
+  // Generate API router
+  const apiRouterPy = `from fastapi import APIRouter
+
+from src.api.v1.endpoints import health, predict
+
+api_router = APIRouter()
+api_router.include_router(health.router, prefix="/health", tags=["health"])
+api_router.include_router(predict.router, prefix="/predict", tags=["predictions"])
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', 'api.py'), apiRouterPy);
+
+  // Generate health endpoint
+  const healthEndpointPy = `from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "version": "0.1.0"}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', 'endpoints', 'health.py'), healthEndpointPy);
+
+  // Generate predict endpoint
+  const predictEndpointPy = `from fastapi import APIRouter, File, UploadFile, HTTPException
+from pydantic import BaseModel
+from typing import List
+import numpy as np
+import logging
+
+from src.ml.model_loader import model_loader
+from src.ml.preprocessing.preprocessor import preprocessor
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+class PredictionRequest(BaseModel):
+    data: List[float]
+    normalize: bool = True
+
+
+class PredictionResponse(BaseModel):
+    prediction: List[float]
+    confidence: float
+
+
+@router.post("/numeric", response_model=PredictionResponse)
+async def predict_numeric(request: PredictionRequest):
+    """Make prediction on numeric data"""
+    try:
+        data = np.array([request.data])
+        
+        if request.normalize:
+            data = preprocessor.normalize(data)
+        
+        model = model_loader.get_model()
+        if model is None:
+            raise HTTPException(status_code=503, detail="Model not loaded")
+        
+        prediction = model.predict(data)
+        confidence = float(np.max(prediction))
+        
+        return PredictionResponse(
+            prediction=prediction[0].tolist(),
+            confidence=confidence
+        )
+    except Exception as e:
+        logger.error(f"Prediction failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/image")
+async def predict_image(file: UploadFile = File(...)):
+    """Make prediction on image data"""
+    try:
+        import io
+        from PIL import Image
+        
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+        image_array = np.array(image)
+        
+        resized = preprocessor.resize_image(image_array, (224, 224))
+        normalized = preprocessor.normalize(resized)
+        
+        model = model_loader.get_model()
+        if model is None:
+            raise HTTPException(status_code=503, detail="Model not loaded")
+        
+        prediction = model.predict(np.expand_dims(normalized, axis=0))
+        
+        return {
+            "filename": file.filename,
+            "prediction": prediction[0].tolist(),
+            "confidence": float(np.max(prediction))
+        }
+    except Exception as e:
+        logger.error(f"Image prediction failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', 'endpoints', 'predict.py'), predictEndpointPy);
+
+  // Generate .env.example
+  const envExample = `# ML API Configuration
+PROJECT_NAME=ML API
+API_VERSION=v1
+
+# Model Configuration
+MODEL_PATH=./models
+MODEL_NAME=default_model
+ML_FRAMEWORK=tensorflow
+USE_GPU=False
+
+# Cache
+REDIS_URL=redis://localhost:6379
+CACHE_ENABLED=False
+
+# MLflow
+MLFLOW_TRACKING_URI=http://localhost:5000
+MLFLOW_ENABLED=False
+
+# Security
+SECRET_KEY=your-secret-key-change-in-production
+
+# Logging
+LOG_LEVEL=INFO
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+  await fs.writeFile(path.join(projectPath, '.env'), envExample);
+
+  // Generate pytest.ini
+  const pytestIni = `[pytest]
+asyncio_mode = auto
+testpaths = tests
+`;
+
+  await fs.writeFile(path.join(projectPath, 'pytest.ini'), pytestIni);
+
+  // Generate test
+  const testPredictPy = `import pytest
+import numpy as np
+from httpx import AsyncClient
+
+
+@pytest.mark.asyncio
+async def test_health_check(client: AsyncClient):
+    """Test health check endpoint"""
+    response = await client.get("/api/v1/health/")
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+
+
+@pytest.mark.asyncio
+async def test_predict_numeric(client: AsyncClient):
+    """Test numeric prediction endpoint"""
+    response = await client.post("/api/v1/predict/numeric", json={
+        "data": [1.0, 2.0, 3.0],
+        "normalize": True
+    })
+    assert response.status_code in [200, 400, 503]  # 400 = no model, 503 = model not loaded
+`;
+
+  await fs.writeFile(path.join(projectPath, 'tests', 'test_predict.py'), testPredictPy);
+
+  // Generate .gitignore
+  const gitignorePy = `# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# ML Models
+models/
+*.h5
+*.pt
+*.pb
+*.pkl
+mlruns/
+
+# Data
+data/
+*.csv
+*.parquet
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MLflow
+mlruns/
+.mlflow/
 
 # OS
 .DS_Store
