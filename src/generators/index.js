@@ -1404,28 +1404,323 @@ edition = "2021"
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+dotenvy = "0.15"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
 `;
 
   await fs.writeFile(path.join(projectPath, 'Cargo.toml'), cargoToml);
 
-  await fs.ensureDir(path.join(projectPath, 'src'));
-  const mainRs = `use axum::{routing::get, Router};
+  // Create directory structure
+  await fs.ensureDir(path.join(projectPath, 'src', 'handlers'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'models'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'middleware'));
+
+  // Generate main.rs
+  const mainRs = `mod handlers;
+mod models;
+mod middleware;
+mod error;
+
+use axum::{
+    routing::{get, post},
+    middleware::Next,
+    response::IntoResponse,
+    Router,
+};
+use std::net::SocketAddr;
+use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber;
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new()
-        .route("/", get(|| async { "Hello, World!" }));
+    // Initialize logging
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    // Load environment variables
+    dotenvy::dotenv().ok();
+
+    let app = Router::new()
+        .route("/", get(handlers::health))
+        .route("/api/v1/health", get(handlers::health))
+        .route("/api/v1/items", get(handlers::list_items))
+        .route("/api/v1/items", post(handlers::create_item))
+        .route("/api/v1/items/:id", get(handlers::get_item))
+        .layer(CorsLayer::permissive())
+        .layer(TraceLayer::new_for_http());
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    
+    println!("🚀 Server running at http://localhost:3000");
+
+    let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .unwrap();
     
-    println!("Server running on http://localhost:3000");
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .await
+        .unwrap();
 }`;
 
   await fs.writeFile(path.join(projectPath, 'src', 'main.rs'), mainRs);
+
+  // Generate error module
+  const errorRs = `use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde_json::json;
+
+#[derive(Debug)]
+pub enum AppError {
+    NotFound(String),
+    BadRequest(String),
+    InternalError(String),
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            AppError::InternalError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+        };
+
+        let body = Json(json!({
+            "error": error_message,
+            "status": status.as_u16(),
+        }));
+
+        (status, body).into_response()
+    }
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'error.rs'), errorRs);
+
+  // Generate models
+  const modelsRs = `use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Item {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateItemRequest {
+    pub name: String,
+    pub description: Option<String>,
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'models', 'mod.rs'), modelsRs);
+
+  // Generate handlers
+  const handlersRs = `use axum::{
+    extract::Path,
+    http::StatusCode,
+    Json,
+};
+use serde_json::json;
+use uuid::Uuid;
+use chrono::Utc;
+use crate::models::{Item, CreateItemRequest};
+
+pub async fn health() -> Json<serde_json::Value> {
+    Json(json!({
+        "status": "healthy",
+        "timestamp": Utc::now().to_rfc3339(),
+    }))
+}
+
+pub async fn list_items() -> Json<serde_json::Value> {
+    let items = vec![
+        Item {
+            id: "1".to_string(),
+            name: "Sample Item 1".to_string(),
+            description: Some("A sample item".to_string()),
+            created_at: Utc::now().to_rfc3339(),
+        },
+    ];
+
+    Json(json!({
+        "items": items,
+        "count": items.len(),
+    }))
+}
+
+pub async fn get_item(Path(id): Path<String>) -> Json<serde_json::Value> {
+    Json(json!({
+        "id": id,
+        "name": "Item Name",
+        "description": "Item description",
+        "created_at": Utc::now().to_rfc3339(),
+    }))
+}
+
+pub async fn create_item(
+    Json(payload): Json<CreateItemRequest>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let item = Item {
+        id: Uuid::new_v4().to_string(),
+        name: payload.name,
+        description: payload.description,
+        created_at: Utc::now().to_rfc3339(),
+    };
+
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "item": item,
+            "message": "Item created successfully",
+        })),
+    )
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'handlers', 'mod.rs'), handlersRs);
+
+  // Generate middleware module
+  const middlewareRs = `// Middleware implementations
+pub async fn logging_middleware() {
+    // Add logging middleware implementation
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'middleware', 'mod.rs'), middlewareRs);
+
+  // Generate README
+  const readmeMd = `# Rust Axum Web Service
+
+A modern, high-performance web service built with Axum, Tokio, and Rust.
+
+## Features
+
+- ⚡ Fast async runtime with Tokio
+- 🛣️ Type-safe routing with Axum
+- 📊 Structured logging with tracing
+- 🔄 CORS middleware support
+- 🆔 UUID generation for resources
+- ⏰ ISO 8601 timestamps
+- 🛡️ Proper error handling
+
+## Quick Start
+
+### Prerequisites
+
+- Rust 1.70+
+- Cargo
+
+### Running the Server
+
+\`\`\`bash
+cargo run
+\`\`\`
+
+The server will start on \`http://localhost:3000\`
+
+### Building for Production
+
+\`\`\`bash
+cargo build --release
+\`\`\`
+
+## API Endpoints
+
+- \`GET /\` - Health check
+- \`GET /api/v1/health\` - Detailed health status
+- \`GET /api/v1/items\` - List all items
+- \`POST /api/v1/items\` - Create new item
+- \`GET /api/v1/items/:id\` - Get specific item
+
+## Project Structure
+
+\`\`\`
+src/
+├── main.rs           # Application entry point
+├── error.rs          # Error handling
+├── handlers/         # Route handlers
+├── models/           # Data models
+└── middleware/       # Custom middleware
+\`\`\`
+
+## License
+
+MIT
+`;
+
+  await fs.writeFile(path.join(projectPath, 'README.md'), readmeMd);
+
+  // Generate .gitignore
+  const gitignore = `# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignore);
+
+  // Generate Dockerfile
+  const dockerfile = `FROM rust:latest as builder
+
+WORKDIR /usr/src/app
+COPY . .
+
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/src/app/target/release/\${PROJECT_NAME} /usr/local/bin/app
+
+EXPOSE 3000
+
+CMD ["app"]
+`;
+
+  await fs.writeFile(path.join(projectPath, 'Dockerfile'), dockerfile);
+
+  // Generate Docker Compose
+  const dockerCompose = `version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - RUST_LOG=info
+`;
+
+  await fs.writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
 }
 
 async function generateGoFiber(projectPath, features) {
