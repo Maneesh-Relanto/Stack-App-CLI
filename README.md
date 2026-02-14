@@ -34,6 +34,14 @@ create-stack-app new my-project
 npx create-stack-app list
 ```
 
+## 📚 Documentation
+
+Get started quickly and learn what each template offers:
+
+- **[QUICK_START.md](QUICK_START.md)** - Step-by-step guide to generate and use projects
+- **[TEMPLATES_GUIDE.md](TEMPLATES_GUIDE.md)** - Detailed reference for all 15 templates
+- **[generated-samples/](generated-samples/)** - Real working examples of each template
+
 ## 🏗️ Available Templates
 
 ### Frontend
