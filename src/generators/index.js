@@ -47,6 +47,9 @@ export async function generateProject(projectPath, templateId, templateConfig, f
       case 'rust-axum':
         await generateRustAxum(projectPath, features);
         break;
+      case 'rust-fullstack':
+        await generateRustFullStack(projectPath, features);
+        break;
       case 'go-fiber':
         await generateGoFiber(projectPath, features);
         break;
@@ -1721,6 +1724,502 @@ services:
 `;
 
   await fs.writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
+}
+
+async function generateRustFullStack(projectPath, features) {
+  // Create workspace structure for Axum backend + Leptos frontend
+  const workspaceCargoToml = `[workspace]
+members = ["backend", "frontend"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+`;
+
+  await fs.writeFile(path.join(projectPath, 'Cargo.toml'), workspaceCargoToml);
+
+  // ===== BACKEND =====
+  const backendCargoToml = `[package]
+name = "backend"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors", "fs"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+dotenvy = "0.15"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+async-trait = "0.1"
+
+[dev-dependencies]
+`;
+
+  await fs.ensureDir(path.join(projectPath, 'backend', 'src'));
+  await fs.writeFile(path.join(projectPath, 'backend', 'Cargo.toml'), backendCargoToml);
+
+  // Backend main.rs
+  const backendMainRs = `mod handlers;
+mod models;
+mod api;
+
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use std::net::SocketAddr;
+use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber;
+
+#[tokio::main]
+async fn main() {
+    // Initialize logging
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
+
+    dotenvy::dotenv().ok();
+
+    let app = Router::new()
+        .route("/health", get(handlers::health))
+        .route("/api/v1/data", get(handlers::get_data))
+        .route("/api/v1/data", post(handlers::create_data))
+        .layer(CorsLayer::permissive())
+        .layer(TraceLayer::new_for_http());
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
+    
+    println!("🚀 Backend API running at http://localhost:3001");
+
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .unwrap();
+    
+    axum::serve(listener, app)
+        .await
+        .unwrap();
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'backend', 'src', 'main.rs'), backendMainRs);
+
+  // Backend models
+  const backendModelsRs = `use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataItem {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateDataRequest {
+    pub title: String,
+    pub description: Option<String>,
+}`;
+
+  await fs.ensureDir(path.join(projectPath, 'backend', 'src', 'models'));
+  await fs.writeFile(path.join(projectPath, 'backend', 'src', 'models', 'mod.rs'), backendModelsRs);
+
+  // Backend handlers
+  const backendHandlersRs = `use axum::{http::StatusCode, Json};
+use serde_json::json;
+use uuid::Uuid;
+use crate::models::{DataItem, CreateDataRequest};
+
+pub async fn health() -> Json<serde_json::Value> {
+    Json(json!({
+        "status": "healthy",
+        "service": "backend"
+    }))
+}
+
+pub async fn get_data() -> Json<serde_json::Value> {
+    let items = vec![
+        DataItem {
+            id: "1".to_string(),
+            title: "Item 1".to_string(),
+            description: Some("Description 1".to_string()),
+        },
+    ];
+    
+    Json(json!({
+        "data": items
+    }))
+}
+
+pub async fn create_data(
+    Json(payload): Json<CreateDataRequest>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let item = DataItem {
+        id: Uuid::new_v4().to_string(),
+        title: payload.title,
+        description: payload.description,
+    };
+
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "item": item
+        })),
+    )
+}`;
+
+  await fs.ensureDir(path.join(projectPath, 'backend', 'src', 'handlers'));
+  await fs.writeFile(path.join(projectPath, 'backend', 'src', 'handlers', 'mod.rs'), backendHandlersRs);
+
+  // Backend API module
+  const backendApiRs = `// API routing utilities
+`;
+
+  await fs.ensureDir(path.join(projectPath, 'backend', 'src', 'api'));
+  await fs.writeFile(path.join(projectPath, 'backend', 'src', 'api', 'mod.rs'), backendApiRs);
+
+  // ===== FRONTEND =====
+  const frontendCargoToml = `[package]
+name = "frontend"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+leptos = { version = "0.5", features = ["csr"] }
+leptos_meta = "0.5"
+leptos_router = "0.5"
+wasm-bindgen = "0.2"
+web-sys = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+fallback-alloc = true
+`;
+
+  await fs.ensureDir(path.join(projectPath, 'frontend', 'src'));
+  await fs.writeFile(path.join(projectPath, 'frontend', 'Cargo.toml'), frontendCargoToml);
+
+  // Frontend lib.rs
+  const frontendLibRs = `use leptos::{component, create_signal, view};
+use leptos_meta::{provide_meta_context, Html, MetaTags, Title};
+use leptos_router::Router;
+
+#[component]
+pub fn App() -> impl leptos::IntoView {
+    provide_meta_context();
+
+    view! {
+        <Html attr:lang="en"/>
+        <Title text="Full-Stack Rust App"/>
+        <MetaTags>
+            <meta name="charset" content="UTF-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+            <link rel="stylesheet" href="/style.css"/>
+        </MetaTags>
+
+        <Router>
+            <Home/>
+        </Router>
+    }
+}
+
+#[component]
+fn Home() -> impl leptos::IntoView {
+    let (count, set_count) = create_signal(0);
+
+    view! {
+        <div class="container">
+            <h1>"Welcome to Full-Stack Rust"</h1>
+            <button on:click=move |_| set_count.set(count() + 1)>
+                "Count: " {count}
+            </button>
+        </div>
+    }
+}
+
+pub fn main() {
+    leptos::mount_to_body(|| view! { <App/> })
+}`;
+
+  await fs.writeFile(path.join(projectPath, 'frontend', 'src', 'lib.rs'), frontendLibRs);
+
+  // Frontend index.html
+  const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full-Stack Rust</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 32px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+</body>
+</html>`;
+
+  await fs.writeFile(path.join(projectPath, 'frontend', 'index.html'), indexHtml);
+
+  // Public style.css
+  const styleCss = `/* Global Styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: #f5f5f5;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+button {
+    padding: 10px 20px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+`;
+
+  await fs.ensureDir(path.join(projectPath, 'public'));
+  await fs.writeFile(path.join(projectPath, 'public', 'style.css'), styleCss);
+
+  // Root README
+  const readmeMd = `# Rust Full-Stack Application
+
+A complete full-stack web application built with Rust, featuring:
+- **Backend**: Axum web framework with async/await
+- **Frontend**: Leptos for interactive UI  
+- **WebAssembly**: WASM-based frontend for blazing-fast performance
+
+## Architecture
+
+\`\`\`
+project/
+├── backend/          # Axum REST API server
+│   ├── src/
+│   │   ├── main.rs   # Entry point
+│   │   ├── handlers/ # HTTP handlers
+│   │   ├── models/   # Data structures
+│   │   └── api/      # API utilities
+│   └── Cargo.toml
+├── frontend/         # Leptos web UI
+│   ├── src/
+│   │   └── lib.rs    # Frontend components
+│   ├── index.html
+│   └── Cargo.toml
+└── Cargo.toml        # Workspace manifest
+\`\`\`
+
+## Prerequisites
+
+- Rust 1.70+
+- Cargo
+
+## Running Locally
+
+### Backend
+
+\`\`\`bash
+cd backend
+cargo run
+\`\`\`
+
+Backend runs on \`http://localhost:3001\`
+
+### Frontend (Development)
+
+\`\`\`bash
+cd frontend
+trunk serve
+\`\`\`
+
+Frontend runs on \`http://localhost:8080\`
+
+## Features
+
+✨ **Type-Safe**: Full type safety across the stack
+⚡ **High Performance**: Async Rust with WASM frontend
+🔄 **Full-Stack Communication**: REST API + WebAssembly
+📦 **Modular**: Separate backend and frontend modules
+🚀 **Production Ready**: Optimized builds included
+
+## Building for Production
+
+### Backend
+\`\`\`bash
+cd backend
+cargo build --release
+\`\`\`
+
+### Frontend
+\`\`\`bash
+cd frontend
+trunk build --release
+\`\`\`
+
+## API Endpoints
+
+- \`GET /health\` - Health check
+- \`GET /api/v1/data\` - Fetch data
+- \`POST /api/v1/data\` - Create data
+
+## License
+
+MIT
+`;
+
+  await fs.writeFile(path.join(projectPath, 'README.md'), readmeMd);
+
+  // .gitignore
+  const gitignore = `# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Frontend
+/frontend/dist/
+/frontend/dist_pkg/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignore);
+
+  // Dockerfile for workspace
+  const dockerfile = `FROM rust:latest as builder
+
+WORKDIR /usr/src/app
+COPY . .
+
+RUN cargo build --release --package backend
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/src/app/target/release/backend /usr/local/bin/backend
+
+EXPOSE 3001
+
+CMD ["backend"]
+`;
+
+  await fs.writeFile(path.join(projectPath, 'Dockerfile'), dockerfile);
+
+  // Docker Compose
+  const dockerCompose = `version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "3001:3001"
+    environment:
+      - RUST_LOG=info
+
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "8080:8080"
+    command: npm install -g trunk && trunk serve
+`;
+
+  await fs.writeFile(path.join(projectPath, 'docker-compose.yml'), dockerCompose);
+
+  // .env.example
+  const envExample = `# Backend Configuration
+RUST_LOG=info
+PORT=3001
+
+# Frontend Configuration
+FRONTEND_PORT=8080
+API_URL=http://localhost:3001
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+  await fs.writeFile(path.join(projectPath, '.env'), envExample);
 }
 
 async function generateGoFiber(projectPath, features) {
