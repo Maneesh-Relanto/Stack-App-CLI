@@ -160,6 +160,30 @@ async function confirmProjectCreation(projectName, templateConfig, features) {
   return confirm;
 }
 
+// Helper: Install dependencies based on language
+async function installProjectDependencies(projectPath, templateConfig) {
+  const installSpinner = ora('Installing dependencies...').start();
+  
+  try {
+    const packageManager = await detectPackageManager();
+    
+    if (templateConfig.language === 'TypeScript' || templateConfig.language === 'JavaScript') {
+      await execa(packageManager, ['install'], { cwd: projectPath });
+    } else if (templateConfig.language === 'Python') {
+      await execa('python', ['-m', 'venv', 'venv'], { cwd: projectPath });
+    } else if (templateConfig.language === 'Rust') {
+      await execa('cargo', ['build'], { cwd: projectPath });
+    } else if (templateConfig.language === 'Go') {
+      await execa('go', ['mod', 'tidy'], { cwd: projectPath });
+    }
+    
+    installSpinner.succeed(chalk.green('Dependencies installed!'));
+  } catch (error) {
+    console.error('Dependency install failed:', error.message);
+    installSpinner.warn(chalk.yellow('Could not install dependencies automatically. Please install them manually.'));
+  }
+}
+
 export async function createProject(projectName, options = {}) {
   try {
     // Step 1: Get project name
@@ -225,25 +249,7 @@ export async function createProject(projectName, options = {}) {
 
     // Step 7: Install dependencies (unless skipped)
     if (!options.skipInstall) {
-      const installSpinner = ora('Installing dependencies...').start();
-      
-      try {
-        const packageManager = await detectPackageManager();
-        
-        if (templateConfig.language === 'TypeScript' || templateConfig.language === 'JavaScript') {
-          await execa(packageManager, ['install'], { cwd: projectPath });
-        } else if (templateConfig.language === 'Python') {
-          await execa('python', ['-m', 'venv', 'venv'], { cwd: projectPath });
-        } else if (templateConfig.language === 'Rust') {
-          await execa('cargo', ['build'], { cwd: projectPath });
-        } else if (templateConfig.language === 'Go') {
-          await execa('go', ['mod', 'tidy'], { cwd: projectPath });
-        }
-        
-        installSpinner.succeed(chalk.green('Dependencies installed!'));
-      } catch (error) {
-        installSpinner.warn(chalk.yellow('Could not install dependencies automatically. Please install them manually.'));
-      }
+      await installProjectDependencies(projectPath, templateConfig);
     }
 
     // Step 8: Success message

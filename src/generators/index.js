@@ -1319,7 +1319,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application Configuration"""
     
-    PROJECT_NAME: str = "${path.basename(projectPath).replace(/-/g, '_')}"
+    PROJECT_NAME: str = "${path.basename(projectPath).replaceAll('-', '_')}"
     API_V1_STR: str = "/api/v1"
     
     # Database
@@ -1381,7 +1381,7 @@ async def health_check():
 
   // Generate .env.example
   const envExample = `# FastAPI Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/${path.basename(projectPath).replace(/-/g, '_')}
+DATABASE_URL=postgresql://user:password@localhost:5432/${path.basename(projectPath).replaceAll('-', '_')}
 SECRET_KEY=your-secret-key-change-in-production
 DEBUG=False
 `;
@@ -3159,7 +3159,7 @@ async function generateReactNativeExpo(projectPath, features) {
   const appJson = {
     expo: {
       name: path.basename(projectPath),
-      slug: path.basename(projectPath).toLowerCase().replace(/[^a-z0-9-]/g, ''),
+      slug: path.basename(projectPath).toLowerCase().replaceAll(/[^a-z0-9-]/g, ''),
       version: '0.1.0',
       orientation: 'portrait',
       icon: './assets/icon.png',
@@ -3172,14 +3172,14 @@ async function generateReactNativeExpo(projectPath, features) {
       assetBundlePatterns: ['**/*'],
       ios: {
         supportsTabletMode: true,
-        bundleIdentifier: `com.${path.basename(projectPath).replace(/[-]/g, '')}`
+        bundleIdentifier: `com.${path.basename(projectPath).replaceAll('-', '')}`
       },
       android: {
         adaptiveIcon: {
           foregroundImage: './assets/adaptive-icon.png',
           backgroundColor: '#ffffff'
         },
-        package: `com.${path.basename(projectPath).replace(/[-]/g, '')}`
+        package: `com.${path.basename(projectPath).replaceAll('-', '')}`
       },
       web: {
         favicon: './assets/favicon.png'
