@@ -2732,6 +2732,11 @@ import (
     "myapp/handlers"
 )
 
+const (
+    itemDetailRoute = "/items/{id}"
+    itemEditRoute   = "/items/{id}/edit"
+)
+
 func main() {
     // Load environment variables
     godotenv.Load()
@@ -2754,10 +2759,10 @@ func main() {
     r.Get("/", handlers.HomePage)
     r.Get("/items", handlers.ListItems)
     r.Post("/items", handlers.CreateItem)
-    r.Get("/items/{id}", handlers.GetItem)
-    r.Put("/items/{id}", handlers.UpdateItem)
-    r.Delete("/items/{id}", handlers.DeleteItem)
-    r.Get("/items/{id}/edit", handlers.EditItemForm)
+    r.Get(itemDetailRoute, handlers.GetItem)
+    r.Put(itemDetailRoute, handlers.UpdateItem)
+    r.Delete(itemDetailRoute, handlers.DeleteItem)
+    r.Get(itemEditRoute, handlers.EditItemForm)
 
     port := os.Getenv("PORT")
     if port == "" {
