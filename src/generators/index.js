@@ -1225,29 +1225,164 @@ dist/
 }
 
 async function generateFastAPI(projectPath, features) {
-  const requirements = `fastapi==0.104.0
+  // Generate requirements.txt with all dependencies
+  const requirementsTxt = `fastapi==0.104.1
 uvicorn[standard]==0.24.0
-sqlalchemy==2.0.0
-alembic==1.12.0
 pydantic==2.5.0
-python-dotenv==1.0.0`;
+pydantic-settings==2.1.0
+sqlalchemy==2.0.23
+alembic==1.13.0
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+httpx==0.25.1
+`;
 
-  await fs.writeFile(path.join(projectPath, 'requirements.txt'), requirements);
+  await fs.writeFile(path.join(projectPath, 'requirements.txt'), requirementsTxt);
 
+  // Create directory structure
+  await fs.ensureDir(path.join(projectPath, 'src', 'api', 'v1', 'endpoints'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'core'));
+  await fs.ensureDir(path.join(projectPath, 'src', 'db'));
+  await fs.ensureDir(path.join(projectPath, 'tests'));
+
+  // Generate main.py
   const mainPy = `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="My API")
+from src.api.v1.api import api_router
+from src.core.config import settings
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to your API!"}
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version="0.1.0",
+    description="Production-ready FastAPI application with PostgreSQL and async support"
+)
 
-@app.get("/health")
-def health_check():
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_HOSTS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API routes
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint"""
     return {"status": "healthy"}
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint"""
+    return {"message": "Welcome to ${path.basename(projectPath)}"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+    )
 `;
 
   await fs.writeFile(path.join(projectPath, 'main.py'), mainPy);
+
+  // Generate config.py
+  const configPy = `import os
+from typing import List
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """Application Configuration"""
+    
+    PROJECT_NAME: str = "${path.basename(projectPath).replace(/-/g, '_')}"
+    API_V1_STR: str = "/api/v1"
+    
+    # Database
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql://user:password@localhost:5432/db"
+    )
+    
+    # Security
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    ALGORITHM: str = "HS256"
+    
+    # CORS
+    ALLOWED_HOSTS: List[str] = ["*"]
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+
+settings = Settings()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'core', 'config.py'), configPy);
+
+  // Generate __init__ files
+  await fs.writeFile(path.join(projectPath, 'src', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'core', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'db', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'api', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', 'endpoints', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'tests', '__init__.py'), '');
+
+  // Generate API router
+  const apiRouterPy = `from fastapi import APIRouter
+
+from src.api.v1.endpoints import health
+
+api_router = APIRouter()
+api_router.include_router(health.router, prefix="/health", tags=["health"])
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', 'api.py'), apiRouterPy);
+
+  // Generate health endpoint
+  const healthEndpointPy = `from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "version": "0.1.0"}
+`;
+
+  await fs.writeFile(path.join(projectPath, 'src', 'api', 'v1', 'endpoints', 'health.py'), healthEndpointPy);
+
+  // Generate .env.example
+  const envExample = `# FastAPI Configuration
+DATABASE_URL=postgresql://user:password@localhost:5432/${path.basename(projectPath).replace(/-/g, '_')}
+SECRET_KEY=your-secret-key-change-in-production
+DEBUG=False
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+  await fs.writeFile(path.join(projectPath, '.env'), envExample);
+
+  // Generate pytest.ini
+  const pytestIni = `[pytest]
+asyncio_mode = auto
+`;
+
+  await fs.writeFile(path.join(projectPath, 'pytest.ini'), pytestIni);
 }
 
 async function generateRustAxum(projectPath, features) {
