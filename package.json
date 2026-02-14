@@ -1,6 +1,6 @@
 {
   "name": "create-stack-app",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "description": "A modern CLI tool to generate production-ready boilerplates across multiple programming languages and frameworks",
   "main": "src/index.js",
   "bin": {
