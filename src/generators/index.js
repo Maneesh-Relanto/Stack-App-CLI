@@ -56,6 +56,9 @@ export async function generateProject(projectPath, templateId, templateConfig, f
       case 'react-native-expo':
         await generateReactNativeExpo(projectPath, features);
         break;
+      case 'django-pro':
+        await generateDjangoPro(projectPath, features);
+        break;
       // Add more template generators as needed
       default:
         console.log(`  ⚠️  No specific generator for ${templateId}, using basic structure...`);
@@ -2233,6 +2236,375 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 
   // Create .env.local (git ignored)
   await fs.writeFile(path.join(projectPath, '.env.local'), envExample);
+}
+
+async function generateDjangoPro(projectPath, features) {
+  // Generate requirements.txt
+  const requirementsTxt = `Django==4.2.8
+djangorestframework==3.14.0
+django-cors-headers==4.3.0
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+celery==5.3.4
+redis==5.0.1
+gunicorn==21.2.0
+whitenoise==6.6.0
+Pillow==10.1.0
+django-filter==23.4
+python-jose[cryptography]==3.3.0
+djangorestframework-simplejwt==5.3.2
+`;
+
+  await fs.writeFile(path.join(projectPath, 'requirements.txt'), requirementsTxt);
+
+  // Create directory structure
+  await fs.ensureDir(path.join(projectPath, 'config'));
+  await fs.ensureDir(path.join(projectPath, 'config', 'settings'));
+  await fs.ensureDir(path.join(projectPath, 'apps', 'api', 'v1', 'endpoints'));
+  await fs.ensureDir(path.join(projectPath, 'apps', 'users'));
+  await fs.ensureDir(path.join(projectPath, 'apps', 'core'));
+  await fs.ensureDir(path.join(projectPath, 'tests'));
+  await fs.ensureDir(path.join(projectPath, 'staticfiles'));
+  await fs.ensureDir(path.join(projectPath, 'media'));
+
+  // Generate manage.py
+  const managePy = `#!/usr/bin/env python
+import os
+import sys
+
+def main():
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+if __name__ == '__main__':
+    main()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'manage.py'), managePy);
+
+  // Generate config/__init__.py
+  await fs.writeFile(path.join(projectPath, 'config', '__init__.py'), '');
+
+  // Generate config/wsgi.py
+  const wsgiPy = `import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
+application = get_wsgi_application()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'config', 'wsgi.py'), wsgiPy);
+
+  // Generate config/asgi.py
+  const asgiPy = `import os
+from django.core.asgi import get_asgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
+application = get_asgi_application()
+`;
+
+  await fs.writeFile(path.join(projectPath, 'config', 'asgi.py'), asgiPy);
+
+  // Generate config/urls.py
+  const urlsPy = `from django.contrib import admin
+from django.urls import path, include
+from django.conf.urls.static import static
+from django.conf import settings
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/v1/', include('apps.api.v1.urls')),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+`;
+
+  await fs.writeFile(path.join(projectPath, 'config', 'urls.py'), urlsPy);
+
+  // Generate settings/__init__.py
+  await fs.writeFile(path.join(projectPath, 'config', 'settings', '__init__.py'), '');
+
+  // Generate base settings
+  const baseSettingsPy = `import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-in-production')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'corsheaders',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'apps.users',
+    'apps.core',
+    'apps.api',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'config.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'config.wsgi.application'
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'db'),
+        'USER': os.getenv('DB_USER', 'user'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'password'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
+    }
+}
+
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# DRF Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100,
+    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
+}
+
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+`;
+
+  await fs.writeFile(path.join(projectPath, 'config', 'settings', 'base.py'), baseSettingsPy);
+
+  // Generate development settings
+  const devSettingsPy = `from .base import *
+
+DEBUG = True
+ALLOWED_HOSTS = ['*']
+`;
+
+  await fs.writeFile(path.join(projectPath, 'config', 'settings', 'development.py'), devSettingsPy);
+
+  // Generate production settings
+  const prodSettingsPy = `from .base import *
+
+DEBUG = False
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+`;
+
+  await fs.writeFile(path.join(projectPath, 'config', 'settings', 'production.py'), prodSettingsPy);
+
+  // Generate apps structure
+  await fs.writeFile(path.join(projectPath, 'apps', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'apps', 'users', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'apps', 'core', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'apps', 'api', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'apps', 'api', 'v1', '__init__.py'), '');
+  await fs.writeFile(path.join(projectPath, 'apps', 'api', 'v1', 'endpoints', '__init__.py'), '');
+
+  // Generate users app
+  const usersModelsPy = `from django.db import models
+from django.contrib.auth.models import AbstractUser
+
+class User(AbstractUser):
+    """Custom User Model"""
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+`;
+
+  await fs.writeFile(path.join(projectPath, 'apps', 'users', 'models.py'), usersModelsPy);
+
+  const usersAppsPy = `from django.apps import AppConfig
+
+class UsersConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.users'
+`;
+
+  await fs.writeFile(path.join(projectPath, 'apps', 'users', 'apps.py'), usersAppsPy);
+
+  // Generate API urls
+  const apiUrlsPy = `from django.urls import path, include
+
+from apps.api.v1.endpoints import health
+
+urlpatterns = [
+    path('health/', health.health_check, name='health_check'),
+]
+`;
+
+  await fs.writeFile(path.join(projectPath, 'apps', 'api', 'v1', 'urls.py'), apiUrlsPy);
+
+  // Generate health endpoint
+  const healthEndpointPy = `from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+@api_view(['GET'])
+def health_check(request):
+    """Health check endpoint"""
+    return Response({'status': 'healthy', 'version': '0.1.0'})
+`;
+
+  await fs.writeFile(path.join(projectPath, 'apps', 'api', 'v1', 'endpoints', 'health.py'), healthEndpointPy);
+
+  // Generate .env.example
+  const envExample = `DEBUG=True
+SECRET_KEY=your-secret-key-change-in-production
+
+# Database
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=db_name
+DB_USER=db_user
+DB_PASSWORD=db_password
+DB_HOST=localhost
+DB_PORT=5432
+
+# Allowed Hosts
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+
+# Celery
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+`;
+
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExample);
+  await fs.writeFile(path.join(projectPath, '.env'), envExample);
+
+  // Generate pytest.ini
+  const pytestIni = `[pytest]
+DJANGO_SETTINGS_MODULE = config.settings.development
+python_files = tests.py test_*.py *_tests.py
+`;
+
+  await fs.writeFile(path.join(projectPath, 'pytest.ini'), pytestIni);
+
+  // Generate .gitignore
+  const gitignorePy = `# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+db.sqlite3
+
+# Django
+local_settings.py
+/media/
+/staticfiles/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+`;
+
+  await fs.writeFile(path.join(projectPath, '.gitignore'), gitignorePy);
 }
 
 async function generateBasicStructure(projectPath, templateConfig) {
