@@ -1,18 +1,21 @@
 # Confidential & Internal Files
 confidential/
 
-# Test & Demo Apps Created by CLI Testing
+# Temporary Test Apps (at root level only - legacy tests)
 test-*/
 my-*/
 demo-*/
 example-*/
 sample-*/
 
+# EXCEPT: Track generated-samples for reference implementations
+!generated-samples/
+
 # Generated Test Output
 test-generator-output/
 test-generator-verification/
 
-# Node & Package Management
+# Node & Package Management - IGNORE EVERYWHERE
 node_modules/
 package-lock.json
 yarn.lock
@@ -20,10 +23,65 @@ pnpm-lock.yaml
 bun.lockb
 dist/
 
-# Environment Variables
+# BUT ALLOW IN generated-samples: package.json and source files
+!generated-samples/**/package.json
+!generated-samples/**/*.js
+!generated-samples/**/*.ts
+!generated-samples/**/*.tsx
+!generated-samples/**/*.jsx
+
+# Python Dependencies - IGNORE
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+*.egg-info/
+
+# BUT ALLOW IN generated-samples: source and config files
+!generated-samples/**/*.py
+!generated-samples/**/requirements.txt
+!generated-samples/**/pyproject.toml
+
+# Rust & Go - IGNORE build artifacts
+target/
+Cargo.lock
+vendor/
+go.sum
+
+# BUT ALLOW IN generated-samples: source and config
+!generated-samples/**/*.rs
+!generated-samples/**/Cargo.toml
+!generated-samples/**/*.go
+!generated-samples/**/go.mod
+
+# .NET - IGNORE build output
+bin/
+obj/
+*.csproj.user
+
+# BUT ALLOW IN generated-samples: source and config
+!generated-samples/**/*.cs
+!generated-samples/**/*.csproj
+
+# Elixir - IGNORE deps and build
+_build/
+deps/
+Mix.lock
+
+# BUT ALLOW IN generated-samples: source and config
+!generated-samples/**/*.ex
+!generated-samples/**/*.exs
+!generated-samples/**/mix.exs
+
+# Environment Variables - IGNORE
 .env
 .env.local
 .env.*.local
+.env.example
+
+# BUT ALLOW .env.example in samples for reference
+!generated-samples/**/.env.example
 
 # IDE & Editor
 .vscode/
@@ -34,8 +92,16 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Common Config - ALLOW IN SAMPLES
+!generated-samples/**/Dockerfile
+!generated-samples/**/docker-compose.yml
+!generated-samples/**/docker-compose.yaml
+!generated-samples/**/.gitignore
+!generated-samples/**/*.md
+!generated-samples/**/.github/
+
 # OS
-.DS_Store
+?.DS_Store
 .AppleDouble
 .LSOverride
 *.log
@@ -45,13 +111,9 @@ yarn-error.log*
 
 # Build & Runtime
 build/
-dist/
 *.o
 *.a
 .cargo/
-target/
-venv/
-__pycache__/
 
 # Temporary Files
 *.tmp
@@ -62,3 +124,4 @@ __pycache__/
 # Development
 .eslintcache
 .stylelintcache
+

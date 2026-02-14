@@ -1,0 +1,60 @@
+# Generated Sample Applications - Dependency Tracking Rules
+# This file defines what to commit and what to ignore in generated-samples/
+
+# ========== IGNORE: Dependencies & Build Artifacts ==========
+
+# Node.js
+generated-samples/*/node_modules/
+generated-samples/*/package-lock.json
+generated-samples/*/yarn.lock
+generated-samples/*/pnpm-lock.yaml
+generated-samples/*/dist/
+generated-samples/*/.next/
+
+# Python
+generated-samples/*/venv/
+generated-samples/*/env/
+generated-samples/*/__pycache__/
+generated-samples/*/*.egg-info/
+generated-samples/*/build/
+generated-samples/*/dist/
+
+# Rust
+generated-samples/*/target/
+generated-samples/*/Cargo.lock
+
+# Go
+generated-samples/*/vendor/
+generated-samples/*/go.sum
+
+# .NET
+generated-samples/*/bin/
+generated-samples/*/obj/
+generated-samples/*/*.csproj.user
+
+# Elixir
+generated-samples/*/_build/
+generated-samples/*/deps/
+generated-samples/*/mix.lock
+
+# Common
+generated-samples/*/.env
+generated-samples/*/.env.local
+generated-samples/*/logs/
+generated-samples/*/*.log
+
+# ========== TRACK: Core Source Files ==========
+# (These are typically included by default in git)
+
+# DO commit:
+# - *.js, *.ts, *.tsx, *.jsx
+# - *.py
+# - *.go
+# - *.rs
+# - *.cs
+# - *.ex, *.exs
+# - *.json (config only: package.json, go.mod, mix.exs, etc.)
+# - *.md (README, documentation)
+# - *.yml, *.yaml (docker-compose, github workflows)
+# - Dockerfile, .dockerignore
+# - .gitignore, .env.example
