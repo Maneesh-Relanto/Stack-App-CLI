@@ -3922,8 +3922,8 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 
 async function generateDjangoPro(projectPath, features) {
   // Generate requirements.txt
-  const requirementsTxt = `Django==4.2.13
-djangorestframework==3.14.0
+  const requirementsTxt = `Django==4.2.14
+djangorestframework==3.14.1
 django-cors-headers==4.3.0
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
@@ -4301,7 +4301,7 @@ flask-jwt-extended==4.5.3
 sqlalchemy==2.0.23
 marshmallow==3.20.1
 psycopg2-binary==2.9.9
-Werkzeug==3.0.1
+Werkzeug==3.0.2
 pytest==7.4.3
 pytest-flask==1.3.0
 `;
