@@ -438,7 +438,7 @@ async function generateNextJsSaas(projectPath, features) {
       ...(features.includes('testing') && { test: 'jest --watch' })
     },
     dependencies: {
-      next: '^14.0.0',
+      next: '^15.0.0',
       react: '^18.2.0',
       'react-dom': '^18.2.0',
       '@supabase/supabase-js': '^2.38.0',
@@ -457,7 +457,7 @@ async function generateNextJsSaas(projectPath, features) {
       'tailwindcss': '^3.3.0',
       ...(features.includes('linting') && {
         'eslint': '^8.56.0',
-        'eslint-config-next': '^14.0.0',
+        'eslint-config-next': '^15.0.0',
         'prettier': '^3.1.0'
       }),
       ...(features.includes('testing') && {
@@ -3157,7 +3157,7 @@ async function generateAISaaS(projectPath, features) {
       ...(features.includes('testing') && { test: 'jest --watch' })
     },
     dependencies: {
-      next: '^14.0.0',
+      next: '^15.0.0',
       react: '^18.2.0',
       'react-dom': '^18.2.0',
       'openai': '^4.28.0',
@@ -3177,7 +3177,7 @@ async function generateAISaaS(projectPath, features) {
       'tailwindcss': '^3.3.0',
       ...(features.includes('linting') && {
         'eslint': '^8.56.0',
-        'eslint-config-next': '^14.0.0',
+        'eslint-config-next': '^15.0.0',
         'prettier': '^3.1.0'
       }),
       ...(features.includes('testing') && {
@@ -3922,7 +3922,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 
 async function generateDjangoPro(projectPath, features) {
   // Generate requirements.txt
-  const requirementsTxt = `Django==4.2.15
+  const requirementsTxt = `Django==4.2.16
 djangorestframework==3.14.1
 django-cors-headers==4.3.0
 psycopg2-binary==2.9.9
@@ -4301,7 +4301,7 @@ flask-jwt-extended==4.5.3
 sqlalchemy==2.0.23
 marshmallow==3.20.1
 psycopg2-binary==2.9.9
-Werkzeug==3.0.2
+Werkzeug==3.0.3
 pytest==7.4.3
 pytest-flask==1.3.0
 `;
