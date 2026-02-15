@@ -1255,9 +1255,9 @@ sqlalchemy==2.0.23
 alembic==1.13.0
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.7
+python-multipart==0.0.22
 httpx==0.25.1
 `;
 
@@ -3922,7 +3922,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 
 async function generateDjangoPro(projectPath, features) {
   // Generate requirements.txt
-  const requirementsTxt = `Django==4.2.16
+  const requirementsTxt = `Django==4.2.26
 djangorestframework==3.14.1
 django-cors-headers==4.3.0
 psycopg2-binary==2.9.9
@@ -3933,7 +3933,7 @@ gunicorn==22.0.0
 whitenoise==6.6.0
 Pillow==10.2.0
 django-filter==23.4
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 djangorestframework-simplejwt==5.3.2
 `;
 
@@ -4295,7 +4295,7 @@ async function generateFlaskAPI(projectPath, features) {
 Flask-RESTful==0.3.10
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.5
-Flask-CORS==4.0.1
+Flask-CORS==4.0.2
 python-dotenv==1.0.0
 flask-jwt-extended==4.5.3
 sqlalchemy==2.0.23
@@ -4644,7 +4644,7 @@ torchvision==0.16.1
 mlflow==2.10.0
 redis==5.0.1
 python-dotenv==1.0.0
-python-multipart==0.0.7
+python-multipart==0.0.22
 pillow==10.2.0
 httpx==0.25.1
 pytest==7.4.3
